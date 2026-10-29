@@ -298,6 +298,216 @@ export const INITIAL_GRIEVANCES: GrievanceTicket[] = [
         status: 'done'
       }
     ]
+  },
+  {
+    token: '#NR-8945',
+    category: 'पेयजल एवं जल शक्ति पाइपलाइन',
+    title: 'वार्ड 08 कोटla चौक पर पेयजल पाइपलाइन मरम्मत व आपातकालीन टैंकर आपूर्ति',
+    titleEn: 'Drinking Water Pipeline Repair & Tanker Deployment in Ward 08',
+    location: 'स्थान: वार्ड 08 कोटला चौक, नूरपुर',
+    wardNo: 8,
+    citizenName: 'रमेश कुमार',
+    phone: '98161*****',
+    status: 'in-progress',
+    submittedDate: '26 Oct 2026, 10:15 AM',
+    whatsappSubscribed: true,
+    timeline: [
+      {
+        title: 'शिकायत दर्ज व संकट अलर्ट जारी',
+        titleEn: 'Complaint Registered & Alert Triggered',
+        timestamp: '26 Oct, 10:15 AM',
+        description: 'वार्ड 8 में पाइपलाइन लीकेज के कारण जलापूर्ति बाधित',
+        descriptionEn: 'Water supply disruption due to pipeline breakage',
+        status: 'done'
+      },
+      {
+        title: '2 आपातकालीन पानी टैंकर रवाना',
+        titleEn: '2 Emergency Water Tankers Dispatched',
+        timestamp: '26 Oct, 11:30 AM',
+        description: 'विधायक वॉर रूम से जल शक्ति विभाग को आदेश, गाड़ियां स्थल पर',
+        descriptionEn: 'Orders issued from MLA War Room, tankers on site',
+        status: 'done'
+      },
+      {
+        title: 'एक्सईएन जल शक्ति टीम द्वारा पाइपलाइन वेल्डिंग जारी',
+        titleEn: 'Pipeline Welding & Fitting In-Progress',
+        timestamp: 'वर्तमान स्थिति',
+        description: 'मुख्य लाइन प्रेशर टेस्टिंग जारी',
+        descriptionEn: 'Main line pressure testing underway',
+        status: 'current'
+      }
+    ]
+  },
+  {
+    token: '#NR-8620',
+    category: 'सौर ऊर्जा व स्ट्रीट लाइट',
+    title: 'वार्ड 14 जसूर बाजार में सोलर हाई-मास्ट लाइट की बैटरी प्रतिस्थापन',
+    titleEn: 'Solar High-Mast Light Battery Replacement at Ward 14 Jasur',
+    location: 'स्थान: वार्ड 14, जसूर चौक, नूरपुर',
+    wardNo: 14,
+    citizenName: 'करनैल सिंह',
+    phone: '94182*****',
+    status: 'verified',
+    submittedDate: '22 Oct 2026, 06:40 PM',
+    whatsappSubscribed: false,
+    timeline: [
+      {
+        title: 'शिकायत दर्ज',
+        titleEn: 'Complaint Registered',
+        timestamp: '22 Oct, 06:40 PM',
+        description: 'शाम के समय अंधेरे की सूचना पन्ना प्रमुख द्वारा प्रेषित',
+        descriptionEn: 'Darkness reported by Panna Pramukh in market area',
+        status: 'done'
+      },
+      {
+        title: 'तकनीकी टीम द्वारा स्थल निरीक्षण',
+        titleEn: 'Technical Inspection Complete',
+        timestamp: '23 Oct, 11:00 AM',
+        description: 'नई लिथियम बैटरी स्वीकृत एवं स्थापित',
+        descriptionEn: 'New lithium battery approved & installed',
+        status: 'done'
+      },
+      {
+        title: 'कैंप ऑफिस व व्यापार मंडल द्वारा कार्य सत्यापित',
+        titleEn: 'Work Verified by Camp Office & Merchant Union',
+        timestamp: '24 Oct, 08:00 PM',
+        description: 'लाइट पूरी क्षमता से प्रज्वलित, स्थानीय व्यापारियों द्वारा संतुष्टि प्रमाण',
+        descriptionEn: 'Light functioning properly, verified on site',
+        status: 'done'
+      }
+    ]
+  },
+  {
+    token: '#NR-8519',
+    category: 'बाढ़ सुरक्षा एवं दंगा निर्माण',
+    title: 'वार्ड 19 भदवार खड्ड कृषि भूमि कटाव सुरक्षा दीवार (दंगा) निरीक्षण',
+    titleEn: 'Ward 19 Bhadwar Khadd Flood Protection Wall Inspection',
+    location: 'स्थान: वार्ड 19 भदवार, नूरपुर',
+    wardNo: 19,
+    citizenName: 'श्रीमती सरोज देवी',
+    phone: '98166*****',
+    status: 'resolved',
+    submittedDate: '18 Oct 2026, 11:00 AM',
+    whatsappSubscribed: true,
+    timeline: [
+      {
+        title: 'शिकायत दर्ज (पदयात्रा जनसंवाद में)',
+        titleEn: 'Complaint Filed in Padyatra',
+        timestamp: '18 Oct, 11:00 AM',
+        description: 'खड्ड के किनारे कृषि भूमि कटाव रोकने हेतु दंगा मांग',
+        descriptionEn: 'Demand for protection wall against land erosion',
+        status: 'done'
+      },
+      {
+        title: 'विधायक निधि से ₹5.20 लाख स्वीकृत',
+        titleEn: '₹5.20 Lakh Sanctioned via MLA-LAD',
+        timestamp: '19 Oct, 04:00 PM',
+        description: 'बीडीओ नूरपुर को तकनीकी प्राक्कलन अनुसार कार्य आदेश',
+        descriptionEn: 'BDO Nurpur issued sanction orders',
+        status: 'done'
+      },
+      {
+        title: '60 मीटर सुरक्षा दीवार निर्माण पूर्ण',
+        titleEn: '60m Protection Wall Construction Complete',
+        timestamp: '25 Oct, 03:00 PM',
+        description: 'ग्राम पंचायत द्वारा पूर्णता प्रमाण पत्र जारी',
+        descriptionEn: 'Panchayat issued completion certificate',
+        status: 'done'
+      }
+    ]
+  },
+  {
+    token: '#NR-8402',
+    category: 'सड़क एवं लिंक मार्ग',
+    title: 'वार्ड 02 नूरपुर शहर गंदराण लिंक रोड इंटरलॉकिंग टाइल्स कार्य',
+    titleEn: 'Interlocking Tiles on Gandran Link Road, Ward 02 Nurpur',
+    location: 'स्थान: वार्ड 02, गंदराण मोहल्ला, नूरपुर',
+    wardNo: 2,
+    citizenName: 'पवन डोगरा',
+    phone: '94188*****',
+    status: 'verified',
+    submittedDate: '15 Oct 2026, 02:15 PM',
+    whatsappSubscribed: true,
+    timeline: [
+      {
+        title: 'मांग पत्र प्राप्त व निरीक्षण',
+        titleEn: 'Application Received & Inspected',
+        timestamp: '15 Oct, 02:15 PM',
+        description: '10 वर्षों से कच्चे रास्ते की समस्या दर्ज',
+        descriptionEn: 'Unpaved road pending since 10 years',
+        status: 'done'
+      },
+      {
+        title: 'PWD व नगर परिषद द्वारा टाइल बिछाने का कार्य पूर्ण',
+        titleEn: 'Interlocking Paver Laying Complete',
+        timestamp: '22 Oct, 05:00 PM',
+        description: 'गुणवत्ता परीक्षण जेई द्वारा सत्यापित',
+        descriptionEn: 'Quality tested & verified by JE',
+        status: 'done'
+      }
+    ]
+  },
+  {
+    token: '#NR-8314',
+    category: 'शिक्षा एवं प्राथमिक विद्यालय',
+    title: 'वार्ड 22 राजकीय प्राथमिक पाठशाला चारदीवारी व छत मरम्मत',
+    titleEn: 'Primary School Boundary Wall & Roof Repair, Ward 22',
+    location: 'स्थान: वार्ड 22, खन्नी मोड़, नूरपुर',
+    wardNo: 22,
+    citizenName: 'मास्टर राकेश शर्मा',
+    phone: '98164*****',
+    status: 'in-progress',
+    submittedDate: '25 Oct 2026, 08:30 AM',
+    whatsappSubscribed: false,
+    timeline: [
+      {
+        title: 'एसएमसी (SMC) प्रस्ताव प्राप्त',
+        titleEn: 'SMC Resolution Received',
+        timestamp: '25 Oct, 08:30 AM',
+        description: 'बच्चों की सुरक्षा हेतु बाउंड्री वॉल मरम्मत की मांग',
+        descriptionEn: 'Request for safety wall around school grounds',
+        status: 'done'
+      },
+      {
+        title: 'विधायक कैंप ऑफिस द्वारा साइट निरीक्षण आदेश',
+        titleEn: 'Site Inspection Ordered by Camp Office',
+        timestamp: '25 Oct, 02:00 PM',
+        description: 'जेई समग्र शिक्षा द्वारा प्राक्कलन तैयार',
+        descriptionEn: 'Estimate prepared for civil works',
+        status: 'current'
+      }
+    ]
+  },
+  {
+    token: '#NR-8990',
+    category: 'सामुदायिक स्वास्थ्य एवं एम्बुलेंस',
+    title: 'वार्ड 07 प्राथमिक स्वास्थ्य उप-केंद्र पर रात्रिकालीन स्टाफ व एम्बुलेंस सेवा',
+    titleEn: 'Night Staff & Ambulance Service at Ward 07 Primary Health Sub-Centre',
+    location: 'स्थान: वार्ड 07, राजा का बाग, नूरपुर',
+    wardNo: 7,
+    citizenName: 'सुनील कटोच',
+    phone: '98167*****',
+    status: 'pending',
+    submittedDate: '27 Oct 2026, 07:15 AM',
+    whatsappSubscribed: true,
+    timeline: [
+      {
+        title: 'शिकायत दर्ज (नागरिक द्वारा)',
+        titleEn: 'Complaint Registered by Citizen',
+        timestamp: '27 Oct, 07:15 AM',
+        description: 'रात के समय आपातकालीन चिकित्सा सेवा हेतु आवेदन',
+        descriptionEn: 'Request for 24x7 emergency medical duty staff',
+        status: 'done'
+      },
+      {
+        title: 'मुख्य चिकित्सा अधिकारी (CMO) को अग्रसारित',
+        titleEn: 'Forwarded to Chief Medical Officer (CMO)',
+        timestamp: 'प्रक्रियाधीन',
+        description: 'कैंप कार्यालय द्वारा आधिकारिक संज्ञान व समीक्षा',
+        descriptionEn: 'Official cognizance taken by Camp Office',
+        status: 'current'
+      }
+    ]
   }
 ];
 

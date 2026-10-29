@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   PlusCircle, 
   Copy, 
@@ -11,9 +11,27 @@ import {
   Radio, 
   MapPin, 
   BellRing,
-  HelpCircle
+  HelpCircle,
+  Filter,
+  SlidersHorizontal,
+  Building2,
+  X,
+  ChevronRight,
+  ShieldCheck,
+  RotateCcw,
+  PieChart as PieChartIcon,
+  TrendingUp,
+  BarChart3,
+  CheckCircle
 } from 'lucide-react';
-import { INITIAL_GRIEVANCES } from '../../data/campaignData';
+import { 
+  ResponsiveContainer, 
+  PieChart, 
+  Pie, 
+  Cell, 
+  Tooltip as RechartsTooltip 
+} from 'recharts';
+import { INITIAL_GRIEVANCES, NURPUR_WARDS } from '../../data/campaignData';
 import { GrievanceTicket, Language } from '../../types/campaign';
 
 interface NivaranScreenProps {
@@ -27,18 +45,168 @@ export const NivaranScreen: React.FC<NivaranScreenProps> = ({
   grievances,
   lang
 }) => {
-  const [searchToken, setSearchToken] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'in-progress' | 'resolved' | 'verified'>('all');
+  const [wardFilter, setWardFilter] = useState<number | 'all'>('all');
+  const [selectedToken, setSelectedToken] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [activeChartIndex, setActiveChartIndex] = useState<number | null>(null);
   const [subscribedTickets, setSubscribedTickets] = useState<Record<string, boolean>>({
     '#NR-8831': true,
-    '#NR-8712': true
+    '#NR-8712': true,
+    '#NR-8945': true
   });
 
-  const allTickets = grievances.length > 0 ? grievances : INITIAL_GRIEVANCES;
+  const allTickets = useMemo(() => {
+    return grievances && grievances.length > 0 ? grievances : INITIAL_GRIEVANCES;
+  }, [grievances]);
 
-  const currentDisplayTicket = searchToken.trim() 
-    ? allTickets.find(t => t.token.toLowerCase().includes(searchToken.toLowerCase().trim())) || allTickets[0]
-    : allTickets[0];
+  // Counts for status metrics
+  const statusCounts = useMemo(() => {
+    const total = allTickets.length;
+    const pending = allTickets.filter(t => t.status === 'pending').length;
+    const inProgress = allTickets.filter(t => t.status === 'in-progress').length;
+    const resolved = allTickets.filter(t => t.status === 'resolved').length;
+    const verified = allTickets.filter(t => t.status === 'verified').length;
+    return { total, pending, inProgress, resolved, verified };
+  }, [allTickets]);
+
+  // Resolution Success Rate
+  const resolutionRate = useMemo(() => {
+    if (statusCounts.total === 0) return 0;
+    return Math.round(((statusCounts.resolved + statusCounts.verified) / statusCounts.total) * 100);
+  }, [statusCounts]);
+
+  // Chart data for Recharts Pie Chart
+  const chartData = useMemo(() => {
+    const items = [
+      {
+        id: 'resolved' as const,
+        name: lang === 'hi' ? 'निस्तारित' : 'Resolved',
+        nameEn: 'Resolved',
+        value: statusCounts.resolved,
+        color: '#10b981', // emerald-500
+        activeColor: '#059669',
+        badgeBg: 'bg-emerald-50',
+        badgeText: 'text-emerald-700',
+        badgeBorder: 'border-emerald-200'
+      },
+      {
+        id: 'in-progress' as const,
+        name: lang === 'hi' ? 'प्रक्रिया में' : 'In Progress',
+        nameEn: 'In Progress',
+        value: statusCounts.inProgress,
+        color: '#f59e0b', // amber-500
+        activeColor: '#d97706',
+        badgeBg: 'bg-amber-50',
+        badgeText: 'text-amber-700',
+        badgeBorder: 'border-amber-200'
+      },
+      {
+        id: 'verified' as const,
+        name: lang === 'hi' ? 'सत्यापित' : 'Verified',
+        nameEn: 'Verified',
+        value: statusCounts.verified,
+        color: '#0ea5e9', // sky-500
+        activeColor: '#0284c7',
+        badgeBg: 'bg-sky-50',
+        badgeText: 'text-sky-700',
+        badgeBorder: 'border-sky-200'
+      },
+      {
+        id: 'pending' as const,
+        name: lang === 'hi' ? 'लंबित' : 'Pending',
+        nameEn: 'Pending',
+        value: statusCounts.pending,
+        color: '#f43f5e', // rose-500
+        activeColor: '#e11d48',
+        badgeBg: 'bg-rose-50',
+        badgeText: 'text-rose-700',
+        badgeBorder: 'border-rose-200'
+      }
+    ];
+
+    return items.filter(d => d.value > 0);
+  }, [statusCounts, lang]);
+
+  // Real-time filtering by status, ward number, and free text search
+  const filteredTickets = useMemo(() => {
+    return allTickets.filter((ticket) => {
+      // 1. Status Filter
+      if (statusFilter !== 'all' && ticket.status !== statusFilter) {
+        return false;
+      }
+
+      // 2. Ward Filter
+      if (wardFilter !== 'all' && ticket.wardNo !== wardFilter) {
+        return false;
+      }
+
+      // 3. Real-time Search Query matching Ward, Status, Token, Title, Location, Citizen
+      if (!searchQuery.trim()) {
+        return true;
+      }
+
+      const query = searchQuery.toLowerCase().trim();
+
+      // Check if query is searching for a specific ward number directly or via text
+      // e.g. "12", "ward 12", "वार्ड 12", "w12", "ward-12", "वार्ड-12"
+      const wardCleanNum = query.replace(/[^\d]/g, '');
+      const wardNumberMatches = 
+        wardCleanNum !== '' && 
+        (Number(wardCleanNum) === ticket.wardNo) &&
+        (query.includes('ward') || query.includes('वार्ड') || query.includes('w') || query === wardCleanNum);
+
+      // Check if query is searching for status keywords
+      const matchesResolved = 
+        (query.includes('resolved') || query.includes('निस्तारित') || query.includes('हल') || query === 'done') && 
+        ticket.status === 'resolved';
+
+      const matchesInProgress = 
+        (query.includes('progress') || query.includes('प्रक्रिया') || query.includes('in-progress') || query.includes('चालू')) && 
+        ticket.status === 'in-progress';
+
+      const matchesVerified = 
+        (query.includes('verified') || query.includes('सत्यापित') || query.includes('प्रमाणित')) && 
+        ticket.status === 'verified';
+
+      const matchesPending = 
+        (query.includes('pending') || query.includes('लंबित') || query.includes('नया') || query.includes('new')) && 
+        ticket.status === 'pending';
+
+      const statusQueryMatches = matchesResolved || matchesInProgress || matchesVerified || matchesPending;
+
+      // Textual matches (token, title, location, category, citizen)
+      const textMatches = 
+        ticket.token.toLowerCase().includes(query) ||
+        ticket.title.toLowerCase().includes(query) ||
+        (ticket.titleEn && ticket.titleEn.toLowerCase().includes(query)) ||
+        ticket.location.toLowerCase().includes(query) ||
+        ticket.citizenName.toLowerCase().includes(query) ||
+        ticket.category.toLowerCase().includes(query);
+
+      return wardNumberMatches || statusQueryMatches || textMatches;
+    });
+  }, [allTickets, statusFilter, wardFilter, searchQuery]);
+
+  // Selected Ticket for detailed timeline view
+  const activeTicket = useMemo(() => {
+    if (filteredTickets.length === 0) return null;
+    if (selectedToken) {
+      const found = filteredTickets.find(t => t.token === selectedToken);
+      if (found) return found;
+    }
+    return filteredTickets[0];
+  }, [filteredTickets, selectedToken]);
+
+  // List of distinct wards present in tickets for quick filter pills
+  const availableWards = useMemo(() => {
+    const wardSet = new Set<number>();
+    allTickets.forEach(t => {
+      if (t.wardNo) wardSet.add(t.wardNo);
+    });
+    return Array.from(wardSet).sort((a, b) => a - b);
+  }, [allTickets]);
 
   const handleCopy = (token: string) => {
     navigator.clipboard?.writeText(token);
@@ -53,41 +221,314 @@ export const NivaranScreen: React.FC<NivaranScreenProps> = ({
     }));
   };
 
+  const resetAllFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+    setWardFilter('all');
+    setSelectedToken(null);
+  };
+
+  const handleSliceClick = (id: 'all' | 'pending' | 'in-progress' | 'resolved' | 'verified') => {
+    if (statusFilter === id) {
+      setStatusFilter('all');
+    } else {
+      setStatusFilter(id);
+    }
+  };
+
+  // Custom styled Tooltip for Recharts Pie Chart
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const renderCustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0];
+      const count = Number(data.value);
+      const percent = statusCounts.total > 0 ? Math.round((count / statusCounts.total) * 100) : 0;
+      return (
+        <div className="bg-slate-900/95 text-white px-3 py-2 rounded-xl shadow-xl border border-slate-700 text-xs backdrop-blur-xs pointer-events-none">
+          <div className="flex items-center gap-2 mb-1">
+            <span
+              className="w-2.5 h-2.5 rounded-full shrink-0"
+              style={{ backgroundColor: data.payload.color }}
+            />
+            <span className="font-bold text-slate-100">{data.name}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4 text-slate-300 font-mono text-[11px]">
+            <span>{lang === 'hi' ? 'शिकायत संख्या:' : 'Count:'} <strong className="text-white font-bold">{count}</strong></span>
+            <span className="text-emerald-400 font-bold">{percent}%</span>
+          </div>
+          <div className="text-[10px] text-slate-400 mt-1 border-t border-slate-800 pt-1">
+            {lang === 'hi' ? 'क्लिक करके फ़िल्टर करें' : 'Click to filter list'}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const hasActiveFilters = searchQuery.trim() !== '' || statusFilter !== 'all' || wardFilter !== 'all';
+
   return (
-    <section className="p-4 space-y-4">
+    <section className="p-4 space-y-4 max-w-7xl mx-auto">
       
-      {/* 1. Live Janta Darbar Metrics */}
-      <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            {lang === 'hi' ? 'लाइव जनता दरबार मैट्रिक्स' : 'Live Grievance Redressal Matrix'}
-          </span>
-          <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-            {lang === 'hi' ? 'अपडेट: 10 मिनट पूर्व' : 'Updated 10m ago'}
-          </span>
+      {/* 1. Live Grievance Redressal Matrix & Recharts Pie Chart Distribution */}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200 space-y-4">
+        {/* Header with Live Badge and Redressal Rate */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+              <PieChartIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                <span>{lang === 'hi' ? 'लाइव शिकायत स्थिति विश्लेषण एवं निवारण' : 'Live Grievance Redressal & Status Distribution'}</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                {lang === 'hi' ? 'रीयल-टाइम निवारण ट्रैकिंग एवं पाई चार्ट विश्लेषण' : 'Real-time grievance redressal breakdown & Recharts analytics'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-2xs">
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+              <span>{lang === 'hi' ? `निवारण दर: ${resolutionRate}%` : `Redressal Rate: ${resolutionRate}%`}</span>
+            </span>
+            <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-1 rounded-lg font-medium">
+              {lang === 'hi' ? 'अपडेट: लाइव' : 'Live'}
+            </span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-100">
-            <div className="text-base font-extrabold text-emerald-700">1,840</div>
-            <div className="text-[10px] text-emerald-800 font-semibold">
+        {/* Status Metrics Counters (5 boxes: Total, Resolved, In Progress, Verified, Pending) */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+          <button 
+            onClick={() => setStatusFilter('all')}
+            className={`p-2.5 rounded-xl border transition text-center cursor-pointer ${
+              statusFilter === 'all' 
+                ? 'bg-slate-900 text-white border-slate-900 shadow-sm ring-2 ring-slate-800' 
+                : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
+            }`}
+            title="Click to view all tickets"
+          >
+            <div className="text-lg font-black">{allTickets.length}</div>
+            <div className={`text-[10px] font-semibold ${statusFilter === 'all' ? 'text-slate-300' : 'text-slate-600'}`}>
+              {lang === 'hi' ? 'कुल शिकायतें' : 'Total Registered'}
+            </div>
+          </button>
+
+          <button 
+            onClick={() => handleSliceClick('resolved')}
+            className={`p-2.5 rounded-xl border transition text-center cursor-pointer ${
+              statusFilter === 'resolved' 
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-500' 
+                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+            }`}
+            title="Click to filter by Resolved"
+          >
+            <div className="text-lg font-black">{statusCounts.resolved}</div>
+            <div className={`text-[10px] font-semibold ${statusFilter === 'resolved' ? 'text-emerald-100' : 'text-emerald-700'}`}>
               {lang === 'hi' ? 'निस्तारित' : 'Resolved'}
             </div>
-          </div>
-          <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-100">
-            <div className="text-base font-extrabold text-amber-700">112</div>
-            <div className="text-[10px] text-amber-800 font-semibold">
+          </button>
+
+          <button 
+            onClick={() => handleSliceClick('in-progress')}
+            className={`p-2.5 rounded-xl border transition text-center cursor-pointer ${
+              statusFilter === 'in-progress' 
+                ? 'bg-amber-600 text-white border-amber-600 shadow-sm ring-2 ring-amber-500' 
+                : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
+            }`}
+            title="Click to filter by In Progress"
+          >
+            <div className="text-lg font-black">{statusCounts.inProgress}</div>
+            <div className={`text-[10px] font-semibold ${statusFilter === 'in-progress' ? 'text-amber-100' : 'text-amber-700'}`}>
               {lang === 'hi' ? 'प्रक्रिया में' : 'In Progress'}
             </div>
+          </button>
+
+          <button 
+            onClick={() => handleSliceClick('verified')}
+            className={`p-2.5 rounded-xl border transition text-center cursor-pointer ${
+              statusFilter === 'verified' 
+                ? 'bg-sky-600 text-white border-sky-600 shadow-sm ring-2 ring-sky-500' 
+                : 'bg-sky-50 hover:bg-sky-100 text-sky-800 border-sky-200'
+            }`}
+            title="Click to filter by Verified"
+          >
+            <div className="text-lg font-black">{statusCounts.verified}</div>
+            <div className={`text-[10px] font-semibold ${statusFilter === 'verified' ? 'text-sky-100' : 'text-sky-700'}`}>
+              {lang === 'hi' ? 'सत्यापित' : 'Verified'}
+            </div>
+          </button>
+
+          <button 
+            onClick={() => handleSliceClick('pending')}
+            className={`col-span-2 sm:col-span-1 p-2.5 rounded-xl border transition text-center cursor-pointer ${
+              statusFilter === 'pending' 
+                ? 'bg-rose-600 text-white border-rose-600 shadow-sm ring-2 ring-rose-500' 
+                : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200'
+            }`}
+            title="Click to filter by Pending"
+          >
+            <div className="text-lg font-black">{statusCounts.pending}</div>
+            <div className={`text-[10px] font-semibold ${statusFilter === 'pending' ? 'text-rose-100' : 'text-rose-700'}`}>
+              {lang === 'hi' ? 'लंबित' : 'Pending'}
+            </div>
+          </button>
+        </div>
+
+        {/* Interactive Pie Chart & Breakdown Grid */}
+        <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <BarChart3 className="w-3.5 h-3.5 text-blue-600" />
+              {lang === 'hi' ? 'शिकायत स्थिति पाई चार्ट वितरण' : 'Grievance Status Distribution (Pie Chart)'}
+            </span>
+            <span className="text-[10px] text-slate-500 italic">
+              {lang === 'hi' ? 'चार्ट स्लाइस पर क्लिक करके फ़िल्टर करें' : 'Click slice to filter in real-time'}
+            </span>
           </div>
-          <div className="bg-sky-50 p-2.5 rounded-xl border border-sky-100">
-            <div className="text-base font-extrabold text-sky-700">48 घंटे</div>
-            <div className="text-[10px] text-sky-800 font-semibold">
-              {lang === 'hi' ? 'औसत समय' : 'Avg Turnaround'}
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+            {/* Recharts Pie Chart Container */}
+            <div className="md:col-span-5 h-[210px] w-full relative flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <RechartsTooltip content={renderCustomTooltip} />
+                  <Pie
+                    data={chartData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={3}
+                    cursor="pointer"
+                    onClick={(entry: any) => {
+                      const targetId = entry?.id || entry?.payload?.id;
+                      if (targetId) handleSliceClick(targetId);
+                    }}
+                  >
+                    {chartData.map((entry) => {
+                      const isSelected = statusFilter === entry.id;
+                      return (
+                        <Cell 
+                          key={`cell-${entry.id}`} 
+                          fill={entry.color}
+                          stroke={isSelected ? '#0f172a' : '#ffffff'}
+                          strokeWidth={isSelected ? 3 : 1.5}
+                          style={{
+                            outline: 'none',
+                            transformOrigin: 'center center',
+                            transition: 'all 0.2s ease'
+                          }}
+                        />
+                      );
+                    })}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+
+              {/* Center Donut Label */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-lg font-black text-slate-900 tracking-tight leading-none">
+                  {statusFilter === 'all' 
+                    ? `${resolutionRate}%` 
+                    : (chartData.find(d => d.id === statusFilter)?.value ?? allTickets.length)}
+                </span>
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider text-center max-w-[70px] mt-0.5 leading-tight">
+                  {statusFilter === 'all' 
+                    ? (lang === 'hi' ? 'निस्तारण दर' : 'Resolved') 
+                    : (lang === 'hi' ? 'चयनित' : 'Filtered')}
+                </span>
+              </div>
+            </div>
+
+            {/* Interactive Status Breakdown & Efficiency Bar */}
+            <div className="md:col-span-7 space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {chartData.map((item) => {
+                  const percent = statusCounts.total > 0 ? Math.round((item.value / statusCounts.total) * 100) : 0;
+                  const isSelected = statusFilter === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => handleSliceClick(item.id)}
+                      className={`flex items-center justify-between p-2 rounded-xl border text-left transition cursor-pointer ${
+                        isSelected 
+                          ? 'bg-white border-blue-500 shadow-xs ring-2 ring-blue-400' 
+                          : 'bg-white/90 hover:bg-white border-slate-200/90 hover:border-slate-300'
+                      }`}
+                      title={`Click to filter by ${item.nameEn}`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span 
+                          className="w-3 h-3 rounded-full shrink-0 shadow-2xs" 
+                          style={{ backgroundColor: item.color }} 
+                        />
+                        <div className="truncate">
+                          <div className="text-xs font-bold text-slate-800 truncate">
+                            {item.name}
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-medium">
+                            {item.nameEn}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                        <span className="text-xs font-mono font-black text-slate-800">
+                          {item.value}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-bold">
+                          {percent}%
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Redressal Progress Bar */}
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200/80">
+                <div className="flex items-center justify-between text-[11px] mb-1.5">
+                  <span className="font-bold text-slate-700 flex items-center gap-1">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{lang === 'hi' ? 'कुल निवारण दक्षता' : 'Redressal Efficiency'}</span>
+                  </span>
+                  <span className="font-mono font-extrabold text-emerald-700">
+                    {statusCounts.resolved + statusCounts.verified} / {statusCounts.total} ({resolutionRate}%)
+                  </span>
+                </div>
+                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden flex">
+                  <div 
+                    className="bg-emerald-500 h-full transition-all duration-500" 
+                    style={{ width: `${statusCounts.total > 0 ? (statusCounts.resolved / statusCounts.total) * 100 : 0}%` }}
+                    title={`Resolved: ${statusCounts.resolved}`}
+                  />
+                  <div 
+                    className="bg-sky-500 h-full transition-all duration-500" 
+                    style={{ width: `${statusCounts.total > 0 ? (statusCounts.verified / statusCounts.total) * 100 : 0}%` }}
+                    title={`Verified: ${statusCounts.verified}`}
+                  />
+                  <div 
+                    className="bg-amber-500 h-full transition-all duration-500" 
+                    style={{ width: `${statusCounts.total > 0 ? (statusCounts.inProgress / statusCounts.total) * 100 : 0}%` }}
+                    title={`In Progress: ${statusCounts.inProgress}`}
+                  />
+                  <div 
+                    className="bg-rose-500 h-full transition-all duration-500" 
+                    style={{ width: `${statusCounts.total > 0 ? (statusCounts.pending / statusCounts.total) * 100 : 0}%` }}
+                    title={`Pending: ${statusCounts.pending}`}
+                  />
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
+
       </div>
 
       {/* 2. Lodge New Complaint Banner */}
@@ -114,132 +555,471 @@ export const NivaranScreen: React.FC<NivaranScreenProps> = ({
         </button>
       </div>
 
-      {/* 3. Search / Track Ticket */}
-      <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-xs flex items-center gap-2">
-        <Search className="w-4 h-4 text-slate-400 shrink-0" />
-        <input 
-          type="text"
-          value={searchToken}
-          onChange={(e) => setSearchToken(e.target.value)}
-          placeholder={lang === 'hi' ? 'टोकन सं. से स्थिति खोजें (उदा: #NR-8831)...' : 'Search by token (e.g. #NR-8831)...'}
-          className="w-full text-xs bg-transparent focus:outline-none text-slate-800 placeholder-slate-400 font-mono"
-        />
-        {searchToken && (
-          <button onClick={() => setSearchToken('')} className="text-slate-400 hover:text-slate-600 text-xs px-1">
-            ✕
-          </button>
-        )}
+      {/* 3. REAL-TIME SEARCH & FILTER BAR (BY STATUS OR WARD NUMBER) */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
+        
+        {/* Header Label */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Search className="w-4 h-4 text-blue-600" />
+            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+              {lang === 'hi' ? 'रियल-टाइम शिकायत खोज व फिल्टर' : 'Real-Time Grievance Search & Filters'}
+            </h4>
+          </div>
+          {hasActiveFilters && (
+            <button
+              onClick={resetAllFilters}
+              className="text-[11px] text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200 transition"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>{lang === 'hi' ? 'फ़िल्टर हटाएं' : 'Reset'}</span>
+            </button>
+          )}
+        </div>
+
+        {/* Real-Time Search Bar Input */}
+        <div className="relative flex items-center">
+          <div className="absolute left-3.5 flex items-center pointer-events-none text-slate-400">
+            <Search className="w-4 h-4" />
+          </div>
+
+          <input 
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={
+              lang === 'hi' 
+                ? 'स्थिति (Resolved/In-Progress) या वार्ड नंबर (उदा: Ward 12, 5, 8, #NR-8831) से खोजें...'
+                : 'Filter by Status (Resolved/In-Progress) or Ward (e.g. Ward 12, 5, 8, #NR-8831)...'
+            }
+            className="w-full text-xs pl-10 pr-9 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white text-slate-800 placeholder-slate-400 transition"
+          />
+
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-200/60 transition"
+              title="Clear search"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Quick Filter Controls: Status Pills & Ward Dropdown */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1 border-t border-slate-100 text-xs">
+          
+          {/* Status Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-bold text-slate-500 mr-1 flex items-center gap-1">
+              <SlidersHorizontal className="w-3 h-3" />
+              {lang === 'hi' ? 'स्थिति:' : 'Status:'}
+            </span>
+
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                statusFilter === 'all'
+                  ? 'bg-[#102a43] text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+              }`}
+            >
+              <span>{lang === 'hi' ? 'सभी' : 'All'}</span>
+              <span className="text-[10px] opacity-80">({statusCounts.total})</span>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter('in-progress')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                statusFilter === 'in-progress'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+              <span>{lang === 'hi' ? 'प्रक्रिया में' : 'In Progress'}</span>
+              <span className="text-[10px]">({statusCounts.inProgress})</span>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter('resolved')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                statusFilter === 'resolved'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
+              }`}
+            >
+              <Check className="w-3 h-3 text-emerald-600" />
+              <span>{lang === 'hi' ? 'निस्तारित' : 'Resolved'}</span>
+              <span className="text-[10px]">({statusCounts.resolved})</span>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter('verified')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                statusFilter === 'verified'
+                  ? 'bg-sky-600 text-white shadow-xs'
+                  : 'bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200'
+              }`}
+            >
+              <ShieldCheck className="w-3 h-3 text-sky-600" />
+              <span>{lang === 'hi' ? 'सत्यापित' : 'Verified'}</span>
+              <span className="text-[10px]">({statusCounts.verified})</span>
+            </button>
+
+            {statusCounts.pending > 0 && (
+              <button
+                onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                  statusFilter === 'pending'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200'
+                }`}
+              >
+                <AlertCircle className="w-3 h-3 text-rose-500" />
+                <span>{lang === 'hi' ? 'लंबित' : 'Pending'}</span>
+                <span className="text-[10px]">({statusCounts.pending})</span>
+              </button>
+            )}
+          </div>
+
+          {/* Ward Number Quick Selector */}
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+              <Building2 className="w-3 h-3" />
+              {lang === 'hi' ? 'वार्ड सं.:' : 'Ward:'}
+            </span>
+
+            <select
+              value={wardFilter === 'all' ? 'all' : wardFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setWardFilter(val === 'all' ? 'all' : Number(val));
+              }}
+              className="bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="all">{lang === 'hi' ? 'सभी 24 वार्ड' : 'All Wards'}</option>
+              {availableWards.map(w => (
+                <option key={w} value={w}>
+                  {lang === 'hi' ? `वार्ड सं. ${w}` : `Ward ${w}`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+        </div>
+
+        {/* Real-time Result Summary & Quick Tag Suggestions */}
+        <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 pt-1">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+              {filteredTickets.length} {lang === 'hi' ? 'शिकायत टिकट मिले' : 'Tickets Found'}
+            </span>
+            {hasActiveFilters && (
+              <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                {lang === 'hi' ? 'रियल-टाइम परिणाम सक्रिय' : 'Filtered in Real-Time'}
+              </span>
+            )}
+          </div>
+
+          {/* Quick-Click Search Hints */}
+          <div className="flex items-center gap-1 text-[10px] mt-1 sm:mt-0">
+            <span className="text-slate-400">{lang === 'hi' ? 'सुझाव:' : 'Try:'}</span>
+            <button
+              onClick={() => setSearchQuery('वार्ड 12')}
+              className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium"
+            >
+              वार्ड 12
+            </button>
+            <button
+              onClick={() => setSearchQuery('वार्ड 8')}
+              className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium"
+            >
+              वार्ड 8
+            </button>
+            <button
+              onClick={() => setSearchQuery('Resolved')}
+              className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-emerald-700 font-medium"
+            >
+              Resolved
+            </button>
+            <button
+              onClick={() => setSearchQuery('In-Progress')}
+              className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-amber-700 font-medium"
+            >
+              In-Progress
+            </button>
+          </div>
+        </div>
+
       </div>
 
-      {/* 4. Active Ticket Details & Timeline */}
-      {currentDisplayTicket && (
-        <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-mono bg-slate-100 text-slate-800 px-2.5 py-0.5 rounded font-extrabold border border-slate-200">
-                {currentDisplayTicket.token}
-              </span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                currentDisplayTicket.status === 'resolved' 
-                  ? 'bg-emerald-100 text-emerald-800' 
-                  : 'bg-amber-100 text-amber-800'
-              }`}>
-                {currentDisplayTicket.status === 'resolved' 
-                  ? (lang === 'hi' ? 'निस्तारित ✓' : 'Resolved') 
-                  : (lang === 'hi' ? 'प्रक्रिया में' : 'In Progress')}
+      {/* 4. REAL-TIME FILTERED TICKETS LIST & TIMELINE SPLIT / DETAIL */}
+      {filteredTickets.length > 0 ? (
+        <div className="space-y-4">
+          
+          {/* Scrollable Horizontal or Grid Ticket Selector */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+              <span>{lang === 'hi' ? 'प्राप्त शिकायतें (क्लिक कर विवरण देखें):' : 'Matching Tickets (Click to inspect):'}</span>
+              <span className="text-[11px] text-slate-400 font-normal">
+                {lang === 'hi' ? 'चयनित: ' : 'Active: '}
+                <strong className="text-slate-700 font-mono">{activeTicket?.token}</strong>
               </span>
             </div>
 
-            <button 
-              onClick={() => handleCopy(currentDisplayTicket.token)}
-              className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 px-2 py-1 rounded-lg border border-slate-200 transition"
-              title="Copy Token"
-            >
-              {copiedToken === currentDisplayTicket.token ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-emerald-700 font-bold">{lang === 'hi' ? 'कॉपी हुआ' : 'Copied'}</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>{lang === 'hi' ? 'कॉपी' : 'Copy'}</span>
-                </>
-              )}
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {filteredTickets.map((t) => {
+                const isSelected = activeTicket?.token === t.token;
+                return (
+                  <div
+                    key={t.token}
+                    onClick={() => setSelectedToken(t.token)}
+                    className={`p-3 rounded-xl border transition-all cursor-pointer relative text-left ${
+                      isSelected
+                        ? 'bg-blue-50/70 border-blue-400 shadow-xs ring-1 ring-blue-400'
+                        : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80 shadow-2xs'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-[11px] font-black bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200">
+                          {t.token}
+                        </span>
+                        <span className="text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200 px-1.5 py-0.5 rounded">
+                          वार्ड {t.wardNo}
+                        </span>
+                      </div>
+
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        t.status === 'resolved'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : t.status === 'verified'
+                            ? 'bg-sky-100 text-sky-800'
+                            : t.status === 'pending'
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {t.status === 'resolved' 
+                          ? (lang === 'hi' ? 'निस्तारित ✓' : 'Resolved') 
+                          : t.status === 'verified'
+                            ? (lang === 'hi' ? 'सत्यापित ✓' : 'Verified')
+                            : t.status === 'pending'
+                              ? (lang === 'hi' ? 'लंबित' : 'Pending')
+                              : (lang === 'hi' ? 'प्रक्रिया में' : 'In Progress')}
+                      </span>
+                    </div>
+
+                    <h5 className="text-xs font-bold text-slate-900 line-clamp-1 leading-snug">
+                      {t.title}
+                    </h5>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 pt-1.5 border-t border-slate-100">
+                      <span className="truncate max-w-[170px]">{t.citizenName}</span>
+                      <span className="text-[10px] text-slate-400 shrink-0 font-mono">
+                        {t.submittedDate.split(',')[0]}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          <h4 className="text-xs font-extrabold text-slate-900 leading-snug">
-            {currentDisplayTicket.title}
-          </h4>
-          <p className="text-[11px] text-slate-500 flex items-center gap-1">
-            <MapPin className="w-3 h-3 text-slate-400" />
-            {currentDisplayTicket.location}
-          </p>
+          {/* Active Ticket Detailed Inspection Card with Stepped Timeline */}
+          {activeTicket && (
+            <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200 space-y-4 animate-in fade-in duration-150">
+              
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-mono bg-slate-900 text-white px-2.5 py-1 rounded-lg font-black tracking-wide">
+                    {activeTicket.token}
+                  </span>
+                  <span className="text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                    <Building2 className="w-3.5 h-3.5 text-amber-700" />
+                    <span>वार्ड सं. {activeTicket.wardNo}</span>
+                  </span>
+                  <span className={`text-xs font-bold px-2.5 py-0.5 rounded-lg flex items-center gap-1 ${
+                    activeTicket.status === 'resolved' 
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                      : activeTicket.status === 'verified'
+                        ? 'bg-sky-100 text-sky-800 border border-sky-200'
+                        : activeTicket.status === 'pending'
+                          ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                          : 'bg-amber-100 text-amber-800 border border-amber-200'
+                  }`}>
+                    {activeTicket.status === 'resolved' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                    {activeTicket.status === 'in-progress' && <Clock className="w-3.5 h-3.5 text-amber-600 animate-spin" />}
+                    {activeTicket.status === 'verified' && <ShieldCheck className="w-3.5 h-3.5 text-sky-600" />}
+                    {activeTicket.status === 'pending' && <AlertCircle className="w-3.5 h-3.5 text-rose-600" />}
+                    <span>
+                      {activeTicket.status === 'resolved' 
+                        ? (lang === 'hi' ? 'निस्तारित (Resolved)' : 'Resolved') 
+                        : activeTicket.status === 'verified'
+                          ? (lang === 'hi' ? 'कार्य सत्यापित (Verified)' : 'Verified')
+                          : activeTicket.status === 'pending'
+                            ? (lang === 'hi' ? 'लंबित संज्ञान (Pending)' : 'Pending')
+                            : (lang === 'hi' ? 'कार्य प्रक्रियाधीन (In Progress)' : 'In Progress')}
+                    </span>
+                  </span>
+                </div>
 
-          {/* Stepped Timeline */}
-          <div className="relative pl-6 space-y-3.5 text-xs before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-emerald-500">
-            {currentDisplayTicket.timeline.map((step, idx) => {
-              if (step.status === 'done') {
-                return (
-                  <div key={idx} className="relative">
-                    <span className="absolute -left-6 top-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white"></span>
-                    <div className="font-bold text-slate-800 text-[11px]">{step.title}</div>
-                    <p className="text-[10px] text-slate-500">
-                      {step.timestamp} • {step.description}
-                    </p>
-                  </div>
-                );
-              }
+                <button 
+                  onClick={() => handleCopy(activeTicket.token)}
+                  className="self-start sm:self-auto flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 transition font-semibold"
+                  title="Copy Token to clipboard"
+                >
+                  {copiedToken === activeTicket.token ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-emerald-700 font-bold">{lang === 'hi' ? 'टोकन कॉपी हुआ!' : 'Copied!'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-slate-500" />
+                      <span>{lang === 'hi' ? 'टोकन कॉपी करें' : 'Copy Token'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
 
-              if (step.status === 'current') {
-                return (
-                  <div key={idx} className="relative bg-amber-50/70 p-2.5 rounded-xl border border-amber-200 -ml-2">
-                    <span className="absolute -left-4 top-3.5 w-3 h-3 bg-amber-500 rounded-full border-2 border-white animate-pulse"></span>
-                    <div className="font-bold text-amber-900 text-[11px] flex justify-between">
-                      <span>{step.title}</span>
-                      <span className="text-[9px] bg-amber-200 text-amber-900 px-1 rounded font-black">सक्रिय</span>
-                    </div>
-                    <p className="text-[10px] text-slate-600 mt-0.5">
-                      {step.timestamp} • {step.description}
-                    </p>
-                  </div>
-                );
-              }
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                  {activeTicket.category}
+                </span>
+                <h4 className="text-sm sm:text-base font-extrabold text-slate-900 leading-snug mt-1.5">
+                  {activeTicket.title}
+                </h4>
+                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 mt-2">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>{activeTicket.location}</span>
+                  </span>
+                  <span>•</span>
+                  <span>आवेदक: <strong className="text-slate-700">{activeTicket.citizenName}</strong></span>
+                  <span>•</span>
+                  <span>पंजीकरण: <strong className="text-slate-700">{activeTicket.submittedDate}</strong></span>
+                </div>
+              </div>
 
-              return (
-                <div key={idx} className="relative">
-                  <span className="absolute -left-6 top-1 w-3 h-3 bg-slate-300 rounded-full border-2 border-white"></span>
-                  <div className="font-bold text-slate-500 text-[11px]">{step.title}</div>
-                  <p className="text-[10px] text-slate-400">
-                    {step.description}
+              {/* Stepped Live Timeline */}
+              <div className="pt-2">
+                <h5 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-blue-600" />
+                  <span>{lang === 'hi' ? 'कार्रवाई प्रगति टाइमलाइन' : 'Action Timeline & Progress'}</span>
+                </h5>
+
+                <div className="relative pl-6 space-y-4 text-xs before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-emerald-500">
+                  {activeTicket.timeline.map((step, idx) => {
+                    if (step.status === 'done') {
+                      return (
+                        <div key={idx} className="relative">
+                          <span className="absolute -left-6 top-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white shadow-xs"></span>
+                          <div className="font-bold text-slate-800 text-xs">{step.title}</div>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            {step.timestamp} • {step.description}
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    if (step.status === 'current') {
+                      return (
+                        <div key={idx} className="relative bg-amber-50/80 p-3 rounded-xl border border-amber-200 -ml-2 shadow-xs">
+                          <span className="absolute -left-4 top-3.5 w-3 h-3 bg-amber-500 rounded-full border-2 border-white animate-pulse"></span>
+                          <div className="font-bold text-amber-900 text-xs flex justify-between items-center">
+                            <span>{step.title}</span>
+                            <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded font-black">
+                              वर्तमान चरण
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-700 mt-1">
+                            {step.timestamp} • {step.description}
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={idx} className="relative">
+                        <span className="absolute -left-6 top-1 w-3 h-3 bg-slate-300 rounded-full border-2 border-white"></span>
+                        <div className="font-bold text-slate-400 text-xs">{step.title}</div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          {step.description}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* WhatsApp Alert Subscription Box */}
+              <div className="p-3 bg-emerald-50/90 rounded-xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+                <div>
+                  <span className="text-emerald-900 font-bold text-xs flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                    {lang === 'hi' ? 'व्हाट्सएप लाइव निवारण अपडेट्स' : 'WhatsApp Live Redressal Alerts'}
+                  </span>
+                  <p className="text-[11px] text-emerald-800 mt-0.5">
+                    {lang === 'hi' 
+                      ? 'प्रत्येक नए कदम पर आपके नंबर पर तत्काल संदेश प्राप्त होगा।' 
+                      : 'Instant SMS and WhatsApp updates at each milestone.'}
                   </p>
                 </div>
-              );
-            })}
+                <button
+                  onClick={() => toggleWhatsAppSub(activeTicket.token)}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-bold transition shrink-0 ${
+                    subscribedTickets[activeTicket.token]
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
+                  }`}
+                >
+                  {subscribedTickets[activeTicket.token] 
+                    ? (lang === 'hi' ? 'सब्सक्राइब है ✓' : 'Subscribed ✓') 
+                    : (lang === 'hi' ? 'अलर्ट्स चालू करें' : 'Subscribe')}
+                </button>
+              </div>
+
+            </div>
+          )}
+
+        </div>
+      ) : (
+        /* Empty State when no tickets match */
+        <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-xs text-center space-y-4">
+          <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto border border-amber-200">
+            <Search className="w-6 h-6" />
+          </div>
+          <div>
+            <h4 className="text-sm font-extrabold text-slate-900">
+              {lang === 'hi' ? 'कोई शिकायत टिकट नहीं मिला' : 'No Matching Grievance Tickets Found'}
+            </h4>
+            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+              {lang === 'hi'
+                ? `आपके द्वारा दिए गए खोज शब्द "${searchQuery}" या चयनित फिल्टर (स्थिति/वार्ड) के अनुसार कोई रिकॉर्ड नहीं मिला।`
+                : `No tickets match "${searchQuery}" or the active status/ward filter.`}
+            </p>
           </div>
 
-          {/* WhatsApp Alert Subscription Box */}
-          <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between text-xs">
-            <span className="text-emerald-800 font-bold text-[11px] flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-              {lang === 'hi' ? 'व्हाट्सएप लाइव अपडेट्स सक्रिय' : 'WhatsApp Live Alerts Active'}
-            </span>
+          <div className="flex items-center justify-center gap-3 pt-1">
             <button
-              onClick={() => toggleWhatsAppSub(currentDisplayTicket.token)}
-              className={`text-[10px] px-2.5 py-1 rounded font-bold transition ${
-                subscribedTickets[currentDisplayTicket.token]
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-              }`}
+              onClick={resetAllFilters}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
             >
-              {subscribedTickets[currentDisplayTicket.token] ? 'Subscribed ✓' : 'Subscribe'}
+              {lang === 'hi' ? 'सभी फिल्टर हटाएं' : 'Clear All Filters'}
+            </button>
+            <button
+              onClick={onOpenComplaintModal}
+              className="px-4 py-2 bg-[#102a43] hover:bg-[#0b1b2b] text-white text-xs font-bold rounded-xl transition"
+            >
+              {lang === 'hi' ? 'नई शिकायत दर्ज करें' : 'Lodge New Complaint'}
             </button>
           </div>
         </div>
       )}
 
-      {/* 5. Emergency Helplines */}
+      {/* 5. Emergency Helplines & Camp Office Desk */}
       <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200">
         <h4 className="text-xs font-extrabold text-slate-900 mb-3 flex items-center gap-1.5">
           <PhoneCall className="w-3.5 h-3.5 text-amber-500" />

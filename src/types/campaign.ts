@@ -111,7 +111,7 @@ export interface GrievanceTicket {
   wardNo: number;
   citizenName: string;
   phone: string;
-  status: 'resolved' | 'in-progress' | 'verified';
+  status: 'resolved' | 'in-progress' | 'verified' | 'pending';
   submittedDate: string;
   timeline: GrievanceTimelineStep[];
   photoUrl?: string;
