@@ -22,7 +22,8 @@ import {
   PieChart as PieChartIcon,
   TrendingUp,
   BarChart3,
-  CheckCircle
+  CheckCircle,
+  Layers
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -555,7 +556,235 @@ export const NivaranScreen: React.FC<NivaranScreenProps> = ({
         </button>
       </div>
 
-      {/* 3. REAL-TIME SEARCH & FILTER BAR (BY STATUS OR WARD NUMBER) */}
+      {/* 3. INTERACTIVE STATUS TOGGLE BUTTON BAR (QUICK STATUS FILTERS) */}
+      <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+              <SlidersHorizontal className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <span>{lang === 'hi' ? 'त्वरित स्थिति टॉगल बटन' : 'Interactive Status Toggle Buttons'}</span>
+                <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded-md">
+                  {lang === 'hi' ? 'क्विक टॉगल' : 'Quick Toggle'}
+                </span>
+              </h4>
+              <p className="text-[11px] text-slate-500">
+                {lang === 'hi' 
+                  ? 'लंबित (Pending), प्रक्रिया में (In Progress), एवं निस्तारित (Resolved) के अनुसार तुरंत टॉगल करें' 
+                  : 'Toggle between Pending, In Progress, and Resolved complaints with a single tap'}
+              </p>
+            </div>
+          </div>
+
+          {statusFilter !== 'all' && (
+            <button
+              onClick={() => setStatusFilter('all')}
+              className="self-start sm:self-auto text-[11px] font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg border border-slate-200 transition flex items-center gap-1 cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3 text-slate-500" />
+              <span>{lang === 'hi' ? 'टॉगल रीसेट करें (सभी देखें)' : 'Show All Tickets'}</span>
+            </button>
+          )}
+        </div>
+
+        {/* The Toggle Buttons Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2">
+          {/* 1. All Tickets Toggle */}
+          <button
+            type="button"
+            onClick={() => setStatusFilter('all')}
+            className={`p-2.5 rounded-xl border font-bold text-xs transition flex flex-col justify-between text-left cursor-pointer active:scale-97 ${
+              statusFilter === 'all'
+                ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-800'
+                : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+            }`}
+          >
+            <div className="flex items-center justify-between w-full mb-1">
+              <span className="text-[10px] uppercase tracking-wide opacity-80 flex items-center gap-1">
+                <Layers className="w-3 h-3" />
+                {lang === 'hi' ? 'सभी' : 'All'}
+              </span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-black ${
+                statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {statusCounts.total}
+              </span>
+            </div>
+            <div className="text-sm font-black truncate">
+              {lang === 'hi' ? 'समस्त शिकायतें' : 'All Grievances'}
+            </div>
+            <div className="text-[10px] opacity-75 mt-0.5">
+              {statusFilter === 'all' 
+                ? (lang === 'hi' ? '✓ सक्रिय चयन' : '✓ Active') 
+                : (lang === 'hi' ? 'टॉगल करें' : 'Tap to filter')}
+            </div>
+          </button>
+
+          {/* 2. Pending Toggle */}
+          <button
+            type="button"
+            onClick={() => handleSliceClick('pending')}
+            className={`p-2.5 rounded-xl border font-bold text-xs transition flex flex-col justify-between text-left cursor-pointer active:scale-97 ${
+              statusFilter === 'pending'
+                ? 'bg-gradient-to-br from-rose-600 to-rose-700 text-white border-rose-600 shadow-md ring-2 ring-rose-400'
+                : 'bg-rose-50/70 hover:bg-rose-100/80 text-rose-800 border-rose-200'
+            }`}
+          >
+            <div className="flex items-center justify-between w-full mb-1">
+              <span className="text-[10px] uppercase tracking-wide opacity-90 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                Pending
+              </span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-black ${
+                statusFilter === 'pending' ? 'bg-white/20 text-white' : 'bg-rose-200/80 text-rose-900'
+              }`}>
+                {statusCounts.pending}
+              </span>
+            </div>
+            <div className="text-sm font-black truncate flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${statusFilter === 'pending' ? 'bg-white animate-ping' : 'bg-rose-500 animate-pulse'}`} />
+              <span>{lang === 'hi' ? 'लंबित' : 'Pending'}</span>
+            </div>
+            <div className="text-[10px] opacity-75 mt-0.5">
+              {statusFilter === 'pending' 
+                ? (lang === 'hi' ? '✓ सक्रिय टॉगल' : '✓ Active Filter') 
+                : (lang === 'hi' ? 'कार्रवाई हेतु प्रतीक्षित' : 'Awaiting Review')}
+            </div>
+          </button>
+
+          {/* 3. In Progress Toggle */}
+          <button
+            type="button"
+            onClick={() => handleSliceClick('in-progress')}
+            className={`p-2.5 rounded-xl border font-bold text-xs transition flex flex-col justify-between text-left cursor-pointer active:scale-97 ${
+              statusFilter === 'in-progress'
+                ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white border-amber-600 shadow-md ring-2 ring-amber-400'
+                : 'bg-amber-50/70 hover:bg-amber-100/80 text-amber-800 border-amber-200'
+            }`}
+          >
+            <div className="flex items-center justify-between w-full mb-1">
+              <span className="text-[10px] uppercase tracking-wide opacity-90 flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                In Progress
+              </span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-black ${
+                statusFilter === 'in-progress' ? 'bg-white/20 text-white' : 'bg-amber-200/80 text-amber-900'
+              }`}>
+                {statusCounts.inProgress}
+              </span>
+            </div>
+            <div className="text-sm font-black truncate flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${statusFilter === 'in-progress' ? 'bg-white animate-spin' : 'bg-amber-500'}`} />
+              <span>{lang === 'hi' ? 'प्रक्रिया में' : 'In Progress'}</span>
+            </div>
+            <div className="text-[10px] opacity-75 mt-0.5">
+              {statusFilter === 'in-progress' 
+                ? (lang === 'hi' ? '✓ सक्रिय टॉगल' : '✓ Active Filter') 
+                : (lang === 'hi' ? 'फील्ड कार्य चालू' : 'Under Action')}
+            </div>
+          </button>
+
+          {/* 4. Resolved Toggle */}
+          <button
+            type="button"
+            onClick={() => handleSliceClick('resolved')}
+            className={`p-2.5 rounded-xl border font-bold text-xs transition flex flex-col justify-between text-left cursor-pointer active:scale-97 ${
+              statusFilter === 'resolved'
+                ? 'bg-gradient-to-br from-emerald-600 to-emerald-700 text-white border-emerald-600 shadow-md ring-2 ring-emerald-400'
+                : 'bg-emerald-50/70 hover:bg-emerald-100/80 text-emerald-800 border-emerald-200'
+            }`}
+          >
+            <div className="flex items-center justify-between w-full mb-1">
+              <span className="text-[10px] uppercase tracking-wide opacity-90 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                Resolved
+              </span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-black ${
+                statusFilter === 'resolved' ? 'bg-white/20 text-white' : 'bg-emerald-200/80 text-emerald-900'
+              }`}>
+                {statusCounts.resolved}
+              </span>
+            </div>
+            <div className="text-sm font-black truncate flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${statusFilter === 'resolved' ? 'bg-white' : 'bg-emerald-500'}`} />
+              <span>{lang === 'hi' ? 'निस्तारित' : 'Resolved'}</span>
+            </div>
+            <div className="text-[10px] opacity-75 mt-0.5">
+              {statusFilter === 'resolved' 
+                ? (lang === 'hi' ? '✓ सक्रिय टॉगल' : '✓ Active Filter') 
+                : (lang === 'hi' ? 'समस्या समाधान पूर्ण' : 'Fully Solved')}
+            </div>
+          </button>
+
+          {/* 5. Verified Toggle */}
+          <button
+            type="button"
+            onClick={() => handleSliceClick('verified')}
+            className={`col-span-2 sm:col-span-4 lg:col-span-1 p-2.5 rounded-xl border font-bold text-xs transition flex flex-col justify-between text-left cursor-pointer active:scale-97 ${
+              statusFilter === 'verified'
+                ? 'bg-gradient-to-br from-sky-600 to-sky-700 text-white border-sky-600 shadow-md ring-2 ring-sky-400'
+                : 'bg-sky-50/70 hover:bg-sky-100/80 text-sky-800 border-sky-200'
+            }`}
+          >
+            <div className="flex items-center justify-between w-full mb-1">
+              <span className="text-[10px] uppercase tracking-wide opacity-90 flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3" />
+                Verified
+              </span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-black ${
+                statusFilter === 'verified' ? 'bg-white/20 text-white' : 'bg-sky-200/80 text-sky-900'
+              }`}>
+                {statusCounts.verified}
+              </span>
+            </div>
+            <div className="text-sm font-black truncate flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${statusFilter === 'verified' ? 'bg-white' : 'bg-sky-500'}`} />
+              <span>{lang === 'hi' ? 'सत्यापित' : 'Verified'}</span>
+            </div>
+            <div className="text-[10px] opacity-75 mt-0.5">
+              {statusFilter === 'verified' 
+                ? (lang === 'hi' ? '✓ सक्रिय टॉगल' : '✓ Active Filter') 
+                : (lang === 'hi' ? 'नागरिक द्वारा प्रमाणित' : 'Citizen Verified')}
+            </div>
+          </button>
+        </div>
+
+        {/* Active Toggle Banner with quick one-click action */}
+        {statusFilter !== 'all' && (
+          <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+              <span className="text-slate-600">
+                {lang === 'hi' ? 'सक्रिय टॉगल स्थिति:' : 'Active Status Filter:'}{' '}
+                <strong className="text-slate-900 capitalize">
+                  {statusFilter === 'pending' 
+                    ? (lang === 'hi' ? 'लंबित (Pending)' : 'Pending')
+                    : statusFilter === 'in-progress'
+                      ? (lang === 'hi' ? 'प्रक्रिया में (In Progress)' : 'In Progress')
+                      : statusFilter === 'resolved'
+                        ? (lang === 'hi' ? 'निस्तारित (Resolved)' : 'Resolved')
+                        : (lang === 'hi' ? 'सत्यापित (Verified)' : 'Verified')}
+                </strong>
+                {' • '}
+                <span className="font-semibold text-blue-700">
+                  {filteredTickets.length} {lang === 'hi' ? 'शिकायतें प्रदर्शित' : 'ticket(s) showing'}
+                </span>
+              </span>
+            </div>
+
+            <button
+              onClick={() => setStatusFilter('all')}
+              className="text-[11px] font-bold text-blue-600 hover:text-blue-800 underline cursor-pointer"
+            >
+              {lang === 'hi' ? 'सभी दिखाएं' : 'Show All'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 4. REAL-TIME SEARCH & FILTER BAR (BY STATUS OR WARD NUMBER) */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
         
         {/* Header Label */}

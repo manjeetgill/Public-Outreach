@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DesktopNavbar } from './components/web/DesktopNavbar';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
@@ -27,6 +27,7 @@ import { MediaPreviewModal } from './components/modals/MediaPreviewModal';
 
 import { INITIAL_GRIEVANCES } from './data/campaignData';
 import { ScreenTab, Language, GrievanceTicket, MediaKitItem } from './types/campaign';
+import { fetchGrievances, subscribeToRealtimeGrievances, createGrievance } from './services/api';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<ScreenTab>('screen-home');
@@ -43,13 +44,52 @@ export default function App() {
   // Dynamic grievances state
   const [grievances, setGrievances] = useState<GrievanceTicket[]>(INITIAL_GRIEVANCES);
 
+  // Real-time REST API & Live Sync Integration
+  useEffect(() => {
+    // 1. Initial REST API load
+    fetchGrievances().then((tickets) => {
+      if (tickets && tickets.length > 0) {
+        setGrievances(tickets);
+      }
+    });
+
+    // 2. Real-time live sync subscription (SSE / Firestore-aligned sync)
+    const unsubscribe = subscribeToRealtimeGrievances((event) => {
+      if (event.type === 'SNAPSHOT' && Array.isArray(event.data)) {
+        setGrievances(event.data);
+      } else if (event.type === 'GRIEVANCE_CREATED' && event.data) {
+        setGrievances((prev) => {
+          if (prev.some(t => t.token === event.data.token)) return prev;
+          return [event.data, ...prev];
+        });
+      } else if (event.type === 'GRIEVANCE_UPDATED' && event.data) {
+        setGrievances((prev) => 
+          prev.map(t => t.token === event.data.token ? event.data : t)
+        );
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const handleSelectTab = (tab: ScreenTab) => {
     setCurrentTab(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleAddGrievance = (newTicket: GrievanceTicket) => {
+  const handleAddGrievance = async (newTicket: GrievanceTicket) => {
+    // Optimistic local update
     setGrievances((prev) => [newTicket, ...prev]);
+    // Persist to REST API backend
+    await createGrievance({
+      category: newTicket.category,
+      title: newTicket.title,
+      titleEn: newTicket.titleEn,
+      location: newTicket.location,
+      wardNo: newTicket.wardNo,
+      citizenName: newTicket.citizenName,
+      phone: newTicket.phone
+    });
   };
 
   const handleToggleLang = () => {

@@ -508,6 +508,37 @@ export const INITIAL_GRIEVANCES: GrievanceTicket[] = [
         status: 'current'
       }
     ]
+  },
+  {
+    token: '#NR-8998',
+    category: 'सिंचाई एवं कूहल (नहर) मरम्मत',
+    title: 'वार्ड 11 जाफरपुर कूहल में सिल्ट भराव से खरीफ फसल सिंचाई में बाधा',
+    titleEn: 'Silt Blockage in Ward 11 Jafarpur Irrigation Kuhal',
+    location: 'स्थान: वार्ड 11, जाफरपुर, नूरपुर',
+    wardNo: 11,
+    citizenName: 'दलजीत सिंह',
+    phone: '98169*****',
+    status: 'pending',
+    submittedDate: '28 Oct 2026, 09:40 AM',
+    whatsappSubscribed: true,
+    timeline: [
+      {
+        title: 'शिकायत दर्ज (किसान प्रतिनिधि द्वारा)',
+        titleEn: 'Complaint Registered by Farmer Rep',
+        timestamp: '28 Oct, 09:40 AM',
+        description: 'खेतों तक पानी पहुंचाने वाली मुख्य कूहल में अवरोध',
+        descriptionEn: 'Blockage in main agricultural kuhal affecting tail-end farms',
+        status: 'done'
+      },
+      {
+        title: 'सिंचाई एवं जन स्वास्थ्य (IPH) उपमंडल को निर्देश',
+        titleEn: 'Instructions Issued to IPH Sub-Division',
+        timestamp: 'लंबित समीक्षा',
+        description: 'जेसीबी से गाद निकासी हेतु प्राथमिकता सूची में शामिल',
+        descriptionEn: 'Queued for priority desilting machine deployment',
+        status: 'pending'
+      }
+    ]
   }
 ];
 
