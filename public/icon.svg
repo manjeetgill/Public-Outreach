@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#102a43"/>
+      <stop offset="50%" stop-color="#0d1b2a"/>
+      <stop offset="100%" stop-color="#08101d"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="saffronGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff8c00"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="512" height="512" rx="100" fill="url(#bgGrad)"/>
+  
+  <!-- Outer Gold Border -->
+  <rect x="16" y="16" width="480" height="480" rx="90" fill="none" stroke="url(#goldGrad)" stroke-width="8" stroke-dasharray="8 4" opacity="0.6"/>
+
+  <!-- Inner Crest Circle -->
+  <circle cx="256" cy="240" r="170" fill="#132742" stroke="url(#saffronGrad)" stroke-width="10"/>
+
+  <!-- Decorative Rays -->
+  <circle cx="256" cy="240" r="148" fill="none" stroke="#f59e0b" stroke-width="2" stroke-opacity="0.4" stroke-dasharray="6 6"/>
+
+  <!-- Ashoka Chakra Style Spokes Center -->
+  <circle cx="256" cy="240" r="60" fill="#0f1f33" stroke="#f59e0b" stroke-width="4"/>
+  <circle cx="256" cy="240" r="16" fill="#f59e0b"/>
+
+  <!-- Emblems & Rays -->
+  <g stroke="#f59e0b" stroke-width="3" stroke-linecap="round" opacity="0.8">
+    <line x1="256" y1="184" x2="256" y2="296"/>
+    <line x1="200" y1="240" x2="312" y2="240"/>
+    <line x1="216" y1="200" x2="296" y2="280"/>
+    <line x1="216" y1="280" x2="296" y2="200"/>
+  </g>
+
+  <!-- Initial Monogram: RN / निक्का -->
+  <text x="256" y="248" font-family="'Noto Sans', sans-serif" font-size="28" font-weight="900" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" letter-spacing="1">RN</text>
+
+  <!-- Top Ribbon Banner: नूरपुर 142 -->
+  <path d="M 176 110 L 336 110 L 320 135 L 192 135 Z" fill="url(#saffronGrad)"/>
+  <text x="256" y="125" font-family="'Noto Sans', sans-serif" font-size="14" font-weight="800" fill="#ffffff" text-anchor="middle">वि.स. 142 नूरपुर</text>
+
+  <!-- Bottom Brand Slogan -->
+  <rect x="80" y="415" width="352" height="50" rx="25" fill="#1e3a5f" stroke="#f59e0b" stroke-width="2"/>
+  <text x="256" y="446" font-family="'Noto Sans', sans-serif" font-size="18" font-weight="800" fill="#fbbf24" text-anchor="middle">घर-घर निक्का • हर घर निक्का</text>
+</svg>

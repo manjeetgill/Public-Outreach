@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "in.ranbirnikka.app",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:7D:0F:52:CC:77:8E:02:77:B5:85:2B:65:4F:1F:AC:49:4F:63:F2:6F:60:90:CA:66:D1:B4:4D:66:FF"
+      ]
+    }
+  }
+]

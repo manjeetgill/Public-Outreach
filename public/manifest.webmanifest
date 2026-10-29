@@ -1,0 +1,34 @@
+{
+  "id": "/",
+  "name": "रणबीर सिंह निक्का • विधायक नूरपुर",
+  "short_name": "Janadesh",
+  "description": "रणबीर सिंह निक्का (विधायक नूरपुर, कांगड़ा) का आधिकारिक नागरिक सेवा, विकास रिपोर्ट व वॉर रूम पोर्टल",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#08101d",
+  "theme_color": "#102a43",
+  "lang": "hi",
+  "categories": ["government", "politics", "utilities", "productivity"],
+  "icons": [
+    {
+      "src": "/pwa-192x192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

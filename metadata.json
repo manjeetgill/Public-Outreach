@@ -1,0 +1,8 @@
+{
+  "name": "Janadesh - Ranbir Singh Nikka MLA Portal",
+  "description": "Official civic interface and election campaign portal for Ranbir Singh Nikka (MLA Nurpur, Kangra). Features 5-year report card, live padyatra tracking, instant grievance resolution, and volunteer mobilization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
