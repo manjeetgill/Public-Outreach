@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { X, Camera, AlertCircle, CheckCircle2, Upload, MapPin, Phone, User } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, Camera, AlertCircle, CheckCircle2, Upload, MapPin, Phone, User, Mic, MicOff, Loader2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { GrievanceTicket, Language } from '../../types/campaign';
+import { transcribeAudio } from '../../services/api';
 
 interface LodgeComplaintModalProps {
   isOpen: boolean;
@@ -24,6 +25,52 @@ export const LodgeComplaintModal: React.FC<LodgeComplaintModalProps> = ({
   const [description, setDescription] = useState('');
   const [photoSelected, setPhotoSelected] = useState<string | null>(null);
   const [submittedToken, setSubmittedToken] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setIsTranscribing(true);
+        try {
+          const text = await transcribeAudio(audioBlob);
+          if (text) {
+            setDescription(prev => prev ? `${prev} ${text}` : text);
+          }
+        } catch (err) {
+          console.error('Transcription error:', err);
+        } finally {
+          setIsTranscribing(false);
+          setIsRecording(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch {
+      alert(lang === 'hi' ? 'माइक्रोफोन की अनुमति दें।' : 'Please allow microphone access.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -254,16 +301,57 @@ export const LodgeComplaintModal: React.FC<LodgeComplaintModalProps> = ({
               </div>
             </div>
 
-            {/* Description */}
+            {/* Description with Voice Transcription */}
             <div>
-              <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                {lang === 'hi' ? 'समस्या का संक्षिप्त विवरण' : 'Description of Issue'}
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-bold text-slate-700">
+                  {lang === 'hi' ? 'समस्या का संक्षिप्त विवरण' : 'Description of Issue'}
+                </label>
+                
+                {/* Voice-to-Text Button using Gemini 3.5 Transcribe */}
+                <button
+                  type="button"
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={isTranscribing}
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 transition ${
+                    isRecording 
+                      ? 'bg-rose-600 text-white animate-pulse shadow-xs' 
+                      : isTranscribing
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200'
+                  }`}
+                  title="Speak your complaint in Hindi or English (Gemini 3.5 Transcribe)"
+                >
+                  {isTranscribing ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin text-amber-600" />
+                      <span>{lang === 'hi' ? 'टेक्स्ट में बदल रहा है...' : 'Transcribing...'}</span>
+                    </>
+                  ) : isRecording ? (
+                    <>
+                      <MicOff className="w-3 h-3 text-white" />
+                      <span>{lang === 'hi' ? 'बोलना बंद करें' : 'Stop'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-3 h-3 text-amber-600" />
+                      <span>{lang === 'hi' ? '🎙️ बोलकर दर्ज करें' : '🎙️ Speak to Type'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
               <textarea 
                 rows={3} 
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder={lang === 'hi' ? 'समस्या को विस्तार से बताएं ताकि टीम तुरंत कार्रवाई कर सके...' : 'Provide details so our rapid response team can take immediate action...'}
+                placeholder={
+                  isRecording 
+                    ? (lang === 'hi' ? '🎤 अपनी समस्या बोलें... रिकॉर्डिंग चालू है' : '🎤 Speak your issue now... recording')
+                    : isTranscribing
+                      ? (lang === 'hi' ? 'ऑडियो टेक्स्ट में बदला जा रहा है...' : 'Transcribing audio via Gemini 3.5...')
+                      : (lang === 'hi' ? 'समस्या को विस्तार से बताएं ताकि टीम तुरंत कार्रवाई कर सके...' : 'Provide details so our rapid response team can take immediate action...')
+                }
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 required
               />

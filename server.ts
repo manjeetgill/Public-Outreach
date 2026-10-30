@@ -2,9 +2,21 @@ import express, { Request, Response } from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import 'dotenv/config';
+import { GoogleGenAI } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Initialize Gemini API client on the server
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    }
+  }
+});
 
 // ============================================================================
 // 1. DATABASE MODELS & IN-MEMORY REPOSITORY (POSTGRESQL & FIRESTORE ALIGNED)
@@ -398,7 +410,8 @@ async function startServer() {
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // CORS headers
   app.use((req, res, next) => {
@@ -647,7 +660,204 @@ async function startServer() {
     });
   });
 
-  // --- VITE MIDDLEWARE (DEV) & STATIC FILES (PROD) ---
+  // ============================================================================
+  // 3. GEMINI AI API ENDPOINTS (SERVER-SIDE)
+  // ============================================================================
+
+  // --- MULTI-TURN GEMINI CHATBOT (gemini-3.8-flash) ---
+  app.post('/api/ai/chat', async (req: Request, res: Response) => {
+    try {
+      const { messages } = req.body;
+      if (!Array.isArray(messages) || messages.length === 0) {
+        res.status(400).json({ success: false, error: 'Messages array is required' });
+        return;
+      }
+
+      // Convert conversation history into contents format
+      const contents = messages.map((m: any) => ({
+        role: m.role === 'assistant' || m.role === 'model' ? 'model' : 'user',
+        parts: [{ text: String(m.content || m.text || '') }]
+      }));
+
+      const systemInstruction = `You are 'Janadesh Mitra' (जनादेश मित्र), the official AI assistant and civic companion for Ranbir Singh Nikka (MLA Nurpur Constituency, Kangra, Himachal Pradesh).
+Role & Personality:
+- Welcoming, humble, polite, and deeply knowledgeable about Nurpur constituency development and citizen welfare.
+- Language: Default to fluent, respectful Hindi (or English if the citizen communicates in English). You understand Himachali/Pahari context.
+Key Knowledge:
+- Ranbir Singh Nikka has sanctioned over ₹312 Crore development works in 24 Wards across Nurpur (roads, bridges, drinking water pipelines, solar lights, hospital upgrades, schools).
+- Janta Darbar Grievance Redressal: Citizens can file complaints with photo proof, track live status (#NR-XXXX tokens), and get fast-tracked resolution.
+- Live Padyatra: Ongoing public outreach connecting with villagers, elderly, youth, and farmers.
+- War Room & Control Center: 24x7 helpline active for Nurpur residents.
+Goal:
+- Provide clear, accurate, and encouraging answers. Keep responses concise (under 3 paragraphs) and offer immediate actionable guidance.`;
+
+      let responseText = '';
+      try {
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents,
+          config: {
+            systemInstruction,
+            temperature: 0.7,
+          }
+        });
+        responseText = response.text || '';
+      } catch (primaryErr) {
+        console.warn('gemini-3.8-flash busy, falling back to gemini-3.1-flash-lite:', primaryErr);
+        const fallbackResponse = await ai.models.generateContent({
+          model: 'gemini-3.1-flash-lite',
+          contents,
+          config: {
+            systemInstruction,
+            temperature: 0.7,
+          }
+        });
+        responseText = fallbackResponse.text || '';
+      }
+
+      res.json({
+        success: true,
+        text: responseText
+      });
+    } catch (err: any) {
+      console.error('Error in /api/ai/chat:', err);
+      res.status(500).json({ 
+        success: false, 
+        error: err.message || 'Chat generation failed' 
+      });
+    }
+  });
+
+  // --- AUDIO TRANSCRIPTION (gemini-3.5-transcribe) ---
+  app.post('/api/ai/transcribe', async (req: Request, res: Response) => {
+    try {
+      const { audioBase64, mimeType } = req.body;
+      if (!audioBase64) {
+        res.status(400).json({ success: false, error: 'Audio data is required' });
+        return;
+      }
+
+      const audioPart = {
+        inlineData: {
+          mimeType: mimeType || 'audio/webm',
+          data: audioBase64
+        }
+      };
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.5-transcribe',
+        contents: {
+          parts: [
+            audioPart,
+            { text: 'Transcribe this spoken audio accurately. The speaker may be speaking in Hindi, Pahari/Kangri, or English. Return only the clean transcription text without any commentary.' }
+          ]
+        }
+      });
+
+      res.json({
+        success: true,
+        text: response.text?.trim() || ''
+      });
+    } catch (err: any) {
+      console.error('Error in /api/ai/transcribe:', err);
+      res.status(500).json({ 
+        success: false, 
+        error: err.message || 'Transcription failed' 
+      });
+    }
+  });
+
+  // --- TEXT TO SPEECH (gemini-3.8-flash-lite-tts) ---
+  app.post('/api/ai/tts', async (req: Request, res: Response) => {
+    try {
+      const { text, voiceName } = req.body;
+      if (!text) {
+        res.status(400).json({ success: false, error: 'Text is required' });
+        return;
+      }
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash-lite-tts',
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: String(text).slice(0, 450) }]
+          }
+        ],
+        config: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: voiceName || 'Zephyr'
+              }
+            }
+          }
+        }
+      });
+
+      const audioPart = response.candidates?.[0]?.content?.parts?.[0];
+      const audioData = (audioPart as any)?.inlineData?.data;
+
+      if (!audioData) {
+        res.status(500).json({ success: false, error: 'No audio generated' });
+        return;
+      }
+
+      res.json({
+        success: true,
+        audioBase64: audioData,
+        mimeType: 'audio/wav'
+      });
+    } catch (err: any) {
+      console.error('Error in /api/ai/tts:', err);
+      res.status(500).json({ success: false, error: err.message || 'TTS failed' });
+    }
+  });
+
+  // --- VIDEO GENERATION & IMAGE ANIMATION (gemini-omni-1.1-flash) ---
+  app.post('/api/ai/video-generate', async (req: Request, res: Response) => {
+    try {
+      const { prompt, imageBase64, aspectRatio = '16:9' } = req.body;
+      if (!prompt && !imageBase64) {
+        res.status(400).json({ success: false, error: 'Prompt or image is required' });
+        return;
+      }
+
+      const contentParts: any[] = [];
+      if (imageBase64) {
+        contentParts.push({
+          inlineData: {
+            mimeType: 'image/jpeg',
+            data: imageBase64
+          }
+        });
+      }
+      if (prompt) {
+        contentParts.push({ text: prompt });
+      }
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-omni-1.1-flash',
+        contents: { parts: contentParts },
+        config: {
+          // @ts-ignore
+          aspectRatio: aspectRatio === '9:16' ? '9:16' : '16:9'
+        }
+      });
+
+      res.json({
+        success: true,
+        videoResult: response.text || 'Video generated successfully'
+      });
+    } catch (err: any) {
+      console.error('Error in /api/ai/video-generate:', err);
+      res.status(500).json({ 
+        success: false, 
+        error: err.message || 'gemini-omni-1.1-flash requires a paid API key configured in Settings > Secrets.' 
+      });
+    }
+  });
   if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.resolve(__dirname, 'dist')));
     app.get('*', (req: Request, res: Response) => {

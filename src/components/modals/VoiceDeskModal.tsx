@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { X, PhoneCall, PhoneOff, Mic, MicOff, Volume2, Sparkles, MessageSquare } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, PhoneCall, PhoneOff, Mic, MicOff, Volume2, Sparkles, MessageSquare, Loader2 } from 'lucide-react';
 import { Language } from '../../types/campaign';
+import { transcribeAudio, sendChatMessage, synthesizeSpeech } from '../../services/api';
 
 interface VoiceDeskModalProps {
   isOpen: boolean;
@@ -10,16 +11,22 @@ interface VoiceDeskModalProps {
 
 export const VoiceDeskModal: React.FC<VoiceDeskModalProps> = ({ isOpen, onClose, lang }) => {
   const [callState, setCallState] = useState<'connecting' | 'connected' | 'ended'>('connecting');
-  const [isMuted, setIsMuted] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [messages, setMessages] = useState<Array<{ sender: 'ai' | 'user'; text: string; time: string }>>([
     {
       sender: 'ai',
-      text: 'नमस्ते! विधायक रणबीर सिंह निक्का जी के 24x7 AI वॉयस सेवा डेस्क में आपका स्वागत है। आप अपनी समस्या, सुझाव या वार्ड का नाम बोलकर बताएं।',
+      text: lang === 'hi' 
+        ? 'नमस्ते! विधायक रणबीर सिंह निक्का जी के 24x7 AI वॉयस सेवा डेस्क में आपका स्वागत है। माइक दबाकर अपनी समस्या या प्रश्न बोलें।' 
+        : 'Namaste! Welcome to MLA Ranbir Singh Nikka 24x7 Voice Desk. Tap the microphone and speak your query.',
       time: '00:01'
     }
   ]);
   const [callDuration, setCallDuration] = useState(1);
-  const [isListening, setIsListening] = useState(false);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -30,7 +37,7 @@ export const VoiceDeskModal: React.FC<VoiceDeskModalProps> = ({ isOpen, onClose,
 
     const timer = setTimeout(() => {
       setCallState('connected');
-    }, 1500);
+    }, 1200);
 
     const interval = setInterval(() => {
       setCallDuration((prev) => prev + 1);
@@ -50,32 +57,98 @@ export const VoiceDeskModal: React.FC<VoiceDeskModalProps> = ({ isOpen, onClose,
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const speakQuery = (userText: string, aiResponse: string) => {
+  const playVoiceResponse = async (text: string) => {
+    try {
+      const audioUrl = await synthesizeSpeech(text, 'Zephyr');
+      if (currentAudioRef.current) currentAudioRef.current.pause();
+      const audio = new Audio(audioUrl);
+      currentAudioRef.current = audio;
+      await audio.play();
+    } catch {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'hi-IN';
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+  };
+
+  const speakQuery = async (userText: string, aiResponse?: string) => {
     const currentTime = formatDuration(callDuration);
     setMessages((prev) => [
       ...prev,
-      { sender: 'user', text: userText, time: currentTime },
-      { sender: 'ai', text: aiResponse, time: currentTime }
+      { sender: 'user', text: userText, time: currentTime }
     ]);
 
-    // Optional browser speech synthesis for immersive experience
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(aiResponse);
-      utterance.lang = 'hi-IN';
-      utterance.rate = 1.0;
-      window.speechSynthesis.speak(utterance);
+    setIsProcessing(true);
+    let reply = aiResponse;
+    if (!reply) {
+      try {
+        reply = await sendChatMessage([{ role: 'user', content: userText }], lang);
+      } catch {
+        reply = lang === 'hi' 
+          ? 'आपकी बात दर्ज कर ली गई है। विधायक कैंप ऑफिस टीम जल्द आपसे संपर्क करेगी।' 
+          : 'Your voice note has been recorded. Camp Office squad will reach out soon.';
+      }
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      { sender: 'ai', text: reply || '', time: currentTime }
+    ]);
+    setIsProcessing(false);
+    if (reply) playVoiceResponse(reply);
+  };
+
+  const startVoiceRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setIsProcessing(true);
+        try {
+          const transcribed = await transcribeAudio(audioBlob);
+          if (transcribed && transcribed.trim()) {
+            await speakQuery(transcribed.trim());
+          }
+        } catch (err) {
+          console.error('Transcription error in voice desk:', err);
+        } finally {
+          setIsProcessing(false);
+          setIsRecording(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch {
+      alert(lang === 'hi' ? 'माइक्रोफोन की अनुमति दें।' : 'Please allow microphone access.');
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
     }
   };
 
   const handleEndCall = () => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
+    if (currentAudioRef.current) currentAudioRef.current.pause();
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     setCallState('ended');
     setTimeout(() => {
       onClose();
-    }, 500);
+    }, 400);
   };
 
   return (
@@ -207,18 +280,31 @@ export const VoiceDeskModal: React.FC<VoiceDeskModalProps> = ({ isOpen, onClose,
         {/* Call Controls */}
         <div className="flex items-center justify-around pt-2 border-t border-slate-800 z-10">
           <button 
-            onClick={() => setIsMuted(!isMuted)}
-            className={`p-3 rounded-full border transition ${
-              isMuted ? 'bg-red-500/20 text-red-400 border-red-500/40' : 'bg-white/10 text-slate-300 border-white/10 hover:bg-white/20'
+            type="button"
+            onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+            disabled={isProcessing}
+            className={`p-3.5 rounded-full border transition flex items-center justify-center cursor-pointer ${
+              isRecording 
+                ? 'bg-rose-600 text-white border-rose-500 animate-pulse shadow-lg ring-4 ring-rose-500/40' 
+                : isProcessing
+                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                  : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
             }`}
-            title="Mute"
+            title={isRecording ? "बोलना रोकें (Stop Speaking)" : "बोलने के लिए दबाएं (Tap to Speak)"}
           >
-            {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            {isProcessing ? (
+              <Loader2 className="w-5 h-5 animate-spin text-amber-400" />
+            ) : isRecording ? (
+              <MicOff className="w-5 h-5" />
+            ) : (
+              <Mic className="w-5 h-5 text-amber-400" />
+            )}
           </button>
 
           <button 
+            type="button"
             onClick={handleEndCall}
-            className="p-4 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg hover:shadow-red-500/30 transition transform active:scale-95"
+            className="p-4 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg hover:shadow-red-500/30 transition transform active:scale-95 cursor-pointer"
             title="End Call"
           >
             <PhoneOff className="w-6 h-6" />
@@ -227,7 +313,7 @@ export const VoiceDeskModal: React.FC<VoiceDeskModalProps> = ({ isOpen, onClose,
           <a 
             href="tel:1800123456" 
             className="p-3 bg-white/10 text-amber-400 hover:bg-white/20 rounded-full border border-white/10 transition"
-            title="Standard Direct Call"
+            title="Direct Helpline Call"
           >
             <PhoneCall className="w-5 h-5" />
           </a>

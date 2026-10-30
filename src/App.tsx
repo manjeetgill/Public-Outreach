@@ -24,6 +24,9 @@ import { VoiceDeskModal } from './components/modals/VoiceDeskModal';
 import { WhatsAppAgentModal } from './components/modals/WhatsAppAgentModal';
 import { VolunteerRegisterModal } from './components/modals/VolunteerRegisterModal';
 import { MediaPreviewModal } from './components/modals/MediaPreviewModal';
+import { JanadeshChatbotModal } from './components/modals/JanadeshChatbotModal';
+import { AiVideoStudioModal } from './components/modals/AiVideoStudioModal';
+import { Bot, Video, Sparkles } from 'lucide-react';
 
 import { INITIAL_GRIEVANCES } from './data/campaignData';
 import { ScreenTab, Language, GrievanceTicket, MediaKitItem } from './types/campaign';
@@ -39,6 +42,8 @@ export default function App() {
   const [isVoiceDeskOpen, setIsVoiceDeskOpen] = useState(false);
   const [isWhatsAppAgentOpen, setIsWhatsAppAgentOpen] = useState(false);
   const [isVolunteerModalOpen, setIsVolunteerModalOpen] = useState(false);
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+  const [isVideoStudioOpen, setIsVideoStudioOpen] = useState(false);
   const [previewMediaItem, setPreviewMediaItem] = useState<MediaKitItem | null>(null);
 
   // Dynamic grievances state
@@ -364,6 +369,44 @@ export default function App() {
       <MediaPreviewModal 
         item={previewMediaItem} 
         onClose={() => setPreviewMediaItem(null)} 
+        lang={lang} 
+      />
+
+      {/* Floating AI Actions (Janadesh Mitra Chat & AI Video Studio) */}
+      <div className="fixed bottom-20 right-3 sm:right-6 z-40 flex flex-col items-end gap-2.5">
+        <button
+          onClick={() => setIsVideoStudioOpen(true)}
+          className="bg-slate-900/90 hover:bg-slate-900 text-amber-400 p-2.5 rounded-full shadow-lg border border-slate-700 backdrop-blur-xs flex items-center gap-1.5 text-xs font-bold transition hover:scale-105 active:scale-95 cursor-pointer"
+          title="AI Video Studio (Gemini Omni)"
+        >
+          <Video className="w-4 h-4 text-amber-400" />
+          <span className="hidden sm:inline text-[11px] text-white">AI Video</span>
+        </button>
+
+        <button
+          onClick={() => setIsChatbotOpen(true)}
+          className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-3.5 py-2.5 rounded-full shadow-xl flex items-center gap-2 text-xs font-black transition hover:scale-105 active:scale-95 group border-2 border-white/20 cursor-pointer"
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+          </span>
+          <Bot className="w-4 h-4" />
+          <span>{lang === 'hi' ? 'जनादेश AI मित्र' : 'AI Civic Chat'}</span>
+        </button>
+      </div>
+
+      {/* Gemini AI Chatbot Modal */}
+      <JanadeshChatbotModal 
+        isOpen={isChatbotOpen} 
+        onClose={() => setIsChatbotOpen(false)} 
+        lang={lang} 
+      />
+
+      {/* AI Video Studio Modal */}
+      <AiVideoStudioModal 
+        isOpen={isVideoStudioOpen} 
+        onClose={() => setIsVideoStudioOpen(false)} 
         lang={lang} 
       />
     </div>

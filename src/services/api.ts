@@ -150,3 +150,98 @@ export function subscribeToRealtimeGrievances(
     return () => {};
   }
 }
+
+/**
+ * Multi-Turn Chatbot using Gemini 3.8 Flash
+ */
+export async function sendChatMessage(
+  messages: Array<{ role: 'user' | 'assistant' | 'model'; content: string }>,
+  lang: string = 'hi'
+): Promise<string> {
+  try {
+    const res = await fetch(`${API_BASE}/ai/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, lang })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Chat request failed');
+    }
+    return data.text;
+  } catch (err: any) {
+    console.error('[API] Chat error:', err);
+    throw err;
+  }
+}
+
+/**
+ * Audio Transcription using Gemini 3.5 Transcribe
+ */
+export async function transcribeAudio(audioBlob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
+        const base64Data = (reader.result as string).split(',')[1];
+        const res = await fetch(`${API_BASE}/ai/transcribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audioBase64: base64Data,
+            mimeType: audioBlob.type || 'audio/webm'
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Transcription failed');
+        }
+        resolve(data.text);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(audioBlob);
+  });
+}
+
+/**
+ * Text-to-Speech using Gemini 3.8 Flash Lite TTS
+ */
+export async function synthesizeSpeech(text: string, voiceName: string = 'Zephyr'): Promise<string> {
+  const res = await fetch(`${API_BASE}/ai/tts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voiceName })
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || 'TTS failed');
+  }
+  return `data:${data.mimeType};base64,${data.audioBase64}`;
+}
+
+/**
+ * Video Generation using Gemini Omni Flash via Interactions API
+ */
+export async function generateAiVideo(params: {
+  prompt?: string;
+  imageBase64?: string;
+  aspectRatio?: '16:9' | '9:16';
+}): Promise<{ success: boolean; videoResult?: string; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/ai/video-generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params)
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
