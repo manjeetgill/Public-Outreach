@@ -34,7 +34,9 @@ import {
   ArrowLeft,
   Loader2,
   Copy,
-  Share2
+  Share2,
+  HeartHandshake,
+  Award
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { MLA_INFO } from '../../data/campaignData';
@@ -49,13 +51,23 @@ import {
   synthesizeSpeech, 
   updateGrievanceStatus 
 } from '../../services/api';
+import { NijaatTrustFundLedger } from '../admin/NijaatTrustFundLedger';
+import { BoothSentimentHeatmap } from '../admin/BoothSentimentHeatmap';
+import { HighCommandDossierModal } from '../admin/HighCommandDossierModal';
+import { VipVoiceBroadcastModal } from '../admin/VipVoiceBroadcastModal';
 
 interface AdminScreenProps {
   lang: Language;
   onBackToOverview?: () => void;
+  onOpenMlaLetter?: () => void;
 }
 
-export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview }) => {
+export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview, onOpenMlaLetter }) => {
+  // VIP Corporate ERP & Leadership Suite state
+  const [executiveView, setExecutiveView] = useState<'WAR_ROOM' | 'TRUST_FUND' | 'BOOTH_HEATMAP'>('WAR_ROOM');
+  const [isDossierModalOpen, setIsDossierModalOpen] = useState(false);
+  const [isVoiceBroadcastModalOpen, setIsVoiceBroadcastModalOpen] = useState(false);
+
   // Decision Card states
   const [sanctionedCards, setSanctionedCards] = useState<Record<string, { status: string; color: string }>>({});
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'WHATSAPP' | 'VOICE' | 'SMS'>('ALL');
@@ -548,6 +560,17 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {onOpenMlaLetter && (
+            <button
+              onClick={onOpenMlaLetter}
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-md flex items-center gap-1.5 active:scale-95 transition border border-blue-400/40"
+              title="विधायक संस्तुति पत्र जारी करें (RSN/MLA-NURPUR/2026/XXXX)"
+            >
+              <FileText className="w-3.5 h-3.5 text-amber-300" />
+              <span>संस्तुति पत्र (MLA Letter)</span>
+            </button>
+          )}
+
           <button 
             onClick={handleDownloadAdminHTML}
             className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 text-xs font-bold px-3 py-2 rounded-xl shadow-md flex items-center gap-1.5 active:scale-95 transition"
@@ -587,8 +610,100 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview
 
       </div>
 
-      {/* 1B. AUTONOMOUS WAR ROOM SLA AGENT & OUTBOUND WHATSAPP STRIP (automation.py & whatsapp_worker.py) */}
-      <div className="bg-gradient-to-r from-[#0d2137] via-[#102a45] to-[#152338] border border-amber-500/40 p-4 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      {/* 1A. EXECUTIVE LEADERSHIP & CORPORATE ERP COMMAND STRIP (RANBIR SINGH NIKKA) */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-amber-500/40 p-3.5 sm:p-4 rounded-2xl shadow-2xl flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-amber-500/20 shrink-0">
+            <Award className="w-5 h-5 text-slate-950" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h3 className="text-white text-sm sm:text-base font-black tracking-wide">
+                रणबीर सिंह निक्का • वीआईपी कॉर्पोरेट ईआरपी व लीडरशिप सूट
+              </h3>
+              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full text-[10px] font-bold">
+                हाई कमान एवं कैबिनेट विजन
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 font-medium">
+              निजी सहायता कोष (निजात ERP), 118-बूथ सेंटिमेंट हीटमैप, हाई कमान डॉसियर एवं 35k नागरिक वॉयस ब्रॉडकास्ट
+            </p>
+          </div>
+        </div>
+
+        {/* View Switchers & High-Impact Triggers */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            onClick={() => setExecutiveView('WAR_ROOM')}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
+              executiveView === 'WAR_ROOM'
+                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
+                : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+            }`}
+          >
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>वार रूम डेस्क</span>
+          </button>
+
+          <button
+            onClick={() => setExecutiveView('TRUST_FUND')}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
+              executiveView === 'TRUST_FUND'
+                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
+                : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+            }`}
+          >
+            <HeartHandshake className="w-3.5 h-3.5 text-amber-400" />
+            <span>निजात ट्रस्ट लेजर (₹3.82 Cr)</span>
+          </button>
+
+          <button
+            onClick={() => setExecutiveView('BOOTH_HEATMAP')}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
+              executiveView === 'BOOTH_HEATMAP'
+                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
+                : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5 text-red-400" />
+            <span>118-बूथ सेंटिमेंट हीटमैप</span>
+          </button>
+
+          <button
+            onClick={() => setIsDossierModalOpen(true)}
+            className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md border border-blue-400/40"
+          >
+            <FileText className="w-3.5 h-3.5 text-amber-300" />
+            <span>हाई कमान डॉसियर</span>
+          </button>
+
+          <button
+            onClick={() => setIsVoiceBroadcastModalOpen(true)}
+            className="px-3.5 py-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md border border-rose-400/40"
+          >
+            <Radio className="w-3.5 h-3.5 animate-pulse" />
+            <span>वीआईपी वॉयस ब्रॉडकास्ट</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Render selected view */}
+      {executiveView === 'TRUST_FUND' && (
+        <NijaatTrustFundLedger lang={lang} onClose={() => setExecutiveView('WAR_ROOM')} />
+      )}
+
+      {executiveView === 'BOOTH_HEATMAP' && (
+        <BoothSentimentHeatmap 
+          lang={lang} 
+          onClose={() => setExecutiveView('WAR_ROOM')} 
+          onOpenTrustFund={() => setExecutiveView('TRUST_FUND')}
+        />
+      )}
+
+      {executiveView === 'WAR_ROOM' && (
+        <>
+          {/* 1B. AUTONOMOUS WAR ROOM SLA AGENT & OUTBOUND WHATSAPP STRIP (automation.py & whatsapp_worker.py) */}
+          <div className="bg-gradient-to-r from-[#0d2137] via-[#102a45] to-[#152338] border border-amber-500/40 p-4 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center shrink-0">
             <Sparkles className="w-5 h-5 animate-pulse" />
@@ -1263,6 +1378,8 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview
           </button>
         </div>
       </div>
+      </>
+      )}
 
       {/* Toast Notification */}
       {toastMessage && (
@@ -1645,6 +1762,15 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview
             </div>
           </div>
         </div>
+      )}
+
+      {/* VIP Corporate ERP & Leadership Suite Modals */}
+      {isDossierModalOpen && (
+        <HighCommandDossierModal lang={lang} onClose={() => setIsDossierModalOpen(false)} />
+      )}
+
+      {isVoiceBroadcastModalOpen && (
+        <VipVoiceBroadcastModal lang={lang} onClose={() => setIsVoiceBroadcastModalOpen(false)} />
       )}
 
     </div>

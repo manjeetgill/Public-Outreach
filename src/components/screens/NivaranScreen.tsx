@@ -23,7 +23,8 @@ import {
   TrendingUp,
   BarChart3,
   CheckCircle,
-  Layers
+  Layers,
+  FileText
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -37,12 +38,14 @@ import { GrievanceTicket, Language } from '../../types/campaign';
 
 interface NivaranScreenProps {
   onOpenComplaintModal: () => void;
+  onOpenMlaLetter?: () => void;
   grievances: GrievanceTicket[];
   lang: Language;
 }
 
 export const NivaranScreen: React.FC<NivaranScreenProps> = ({
   onOpenComplaintModal,
+  onOpenMlaLetter,
   grievances,
   lang
 }) => {
@@ -532,28 +535,64 @@ export const NivaranScreen: React.FC<NivaranScreenProps> = ({
 
       </div>
 
-      {/* 2. Lodge New Complaint Banner */}
-      <div className="bg-gradient-to-br from-[#102a43] to-[#1c3d5a] text-white rounded-2xl p-4 shadow-md">
-        <div className="flex items-center gap-2 text-xs font-bold text-amber-400 mb-1">
-          <span className="w-2 h-2 bg-amber-400 rounded-full animate-ping"></span>
-          {lang === 'hi' ? 'जन समस्या निवारण • प्रत्यक्ष पंजीकरण' : 'Civic Grievance Desk • Instant Registration'}
+      {/* 2. Direct Citizen Actions: Lodge Grievance & MLA Recommendation Letter */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Lodge New Complaint Banner */}
+        <div className="bg-gradient-to-br from-[#102a43] to-[#1c3d5a] text-white rounded-2xl p-4 shadow-md flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-400 mb-1">
+              <span className="w-2 h-2 bg-amber-400 rounded-full animate-ping"></span>
+              {lang === 'hi' ? 'जन समस्या निवारण • प्रत्यक्ष पंजीकरण' : 'Civic Grievance Desk • Instant Registration'}
+            </div>
+            <h3 className="text-sm font-extrabold mb-1">
+              {lang === 'hi' ? 'नई शिकायत सीधे दर्ज करें' : 'Lodge New Civic Complaint Directly'}
+            </h3>
+            <p className="text-xs text-slate-300 mb-3 leading-relaxed">
+              {lang === 'hi' 
+                ? 'सड़क, बिजली, पानी या स्वास्थ्य की समस्या फोटो सहित विधायक कैंप ऑफिस भेजें।'
+                : 'Submit photo, location and details directly to MLA camp office desk.'}
+            </p>
+          </div>
+          
+          <button 
+            onClick={onOpenComplaintModal}
+            className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition active:scale-98"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>{lang === 'hi' ? 'समस्या दर्ज करें • फोटो व विवरण अपलोड करें' : 'File Complaint • Attach Photo & Details'}</span>
+          </button>
         </div>
-        <h3 className="text-sm font-extrabold mb-1">
-          {lang === 'hi' ? 'नई शिकायत सीधे दर्ज करें' : 'Lodge New Civic Complaint Directly'}
-        </h3>
-        <p className="text-xs text-slate-300 mb-3 leading-relaxed">
-          {lang === 'hi' 
-            ? 'सड़क, बिजली, पानी या स्वास्थ्य की समस्या फोटो सहित विधायक कैंप ऑफिस भेजें।'
-            : 'Submit photo, location and details directly to MLA camp office desk.'}
-        </p>
-        
-        <button 
-          onClick={onOpenComplaintModal}
-          className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition active:scale-98"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>{lang === 'hi' ? 'समस्या दर्ज करें • फोटो व विवरण अपलोड करें' : 'File Complaint • Attach Photo & Details'}</span>
-        </button>
+
+        {/* MLA Official Recommendation Letter Banner */}
+        <div className="bg-gradient-to-br from-slate-900 to-[#0e2439] text-white rounded-2xl p-4 shadow-md border border-slate-700/60 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
+                <FileText className="w-4 h-4 text-emerald-400" />
+                <span>{lang === 'hi' ? 'राजकीय संस्तुति पत्र सेवा' : 'Official Recommendation Letter'}</span>
+              </div>
+              <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                RSN/MLA-NURPUR/2026
+              </span>
+            </div>
+            <h3 className="text-sm font-extrabold mb-1">
+              {lang === 'hi' ? 'विधायक संस्तुति पत्र जारी करें' : 'Generate MLA Recommendation Letter'}
+            </h3>
+            <p className="text-xs text-slate-300 mb-3 leading-relaxed">
+              {lang === 'hi'
+                ? 'अस्पताल इलाज (PGI/टांडा), छात्रवृत्ति, बिजली/पानी कनेक्शन व ट्रांसफार्मर हेतु 1-क्लिक में आधिकारिक पत्र पाएं।'
+                : 'Generate official Vidhan Sabha recommendation letters with QR verification for medical, schooling & utilities.'}
+            </p>
+          </div>
+
+          <button
+            onClick={onOpenMlaLetter}
+            className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition active:scale-98"
+          >
+            <FileText className="w-4 h-4 text-amber-300" />
+            <span>{lang === 'hi' ? 'संस्तुति पत्र तैयार करें (A4 प्रिंट व WhatsApp)' : 'Generate MLA Letter (A4 & WhatsApp)'}</span>
+          </button>
+        </div>
       </div>
 
       {/* 3. INTERACTIVE STATUS TOGGLE BUTTON BAR (QUICK STATUS FILTERS) */}

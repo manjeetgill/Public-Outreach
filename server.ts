@@ -1712,6 +1712,18 @@ Return only the clean transcription text in Hindi script without preamble or not
     });
   });
 
+  // Alias endpoint requested by prompt
+  app.get('/api/booth/:boothNo/voters', (req: Request, res: Response) => {
+    const boothNo = parseInt(req.params.boothNo, 10) || 41;
+    let voters = sampleBoothVoters.filter(v => v.boothNo === boothNo);
+    res.json({
+      success: true,
+      boothNo,
+      totalCount: voters.length,
+      voters
+    });
+  });
+
   // 1b. BOOTH SYNC BATCH (Flush offline mutations)
   app.post('/api/booth/sync-batch', (req: Request, res: Response) => {
     try {
@@ -1831,6 +1843,7 @@ Return only the clean transcription text in Hindi script without preamble or not
     villageOrWard: string;
     mobile: string;
     category: string;
+    purposeType?: 'MEDICAL_AID' | 'TRANSFORMER' | 'ROAD_DANGA' | 'SCHOOL_FEE' | 'WATER_PIPELINE' | string;
     subject: string;
     targetOfficer: string;
     targetDepartment: string;
@@ -1840,12 +1853,13 @@ Return only the clean transcription text in Hindi script without preamble or not
   }
   const generatedMlaLetters: MlaLetterStoreItem[] = [
     {
-      dispatchNo: 'RSN/MLA/2026/0891',
+      dispatchNo: 'RSN/MLA-NURPUR/2026/0891',
       citizenName: 'रमेश कुमार',
       guardianName: 'श्री ध्यान चंद',
       villageOrWard: 'वार्ड 08 भदवार, नूरपुर',
       mobile: '9816012345',
       category: 'विद्युत ट्रांसफार्मर अपग्रेड / तार मरम्मत',
+      purposeType: 'TRANSFORMER',
       subject: 'वार्ड 08 में कम वोल्टेज व 63kVA को 100kVA में अपग्रेड करने हेतु',
       targetOfficer: 'अधिशासी अभियंता (XEN)',
       targetDepartment: 'हिमाचल प्रदेश राज्य विद्युत परिषद (HPSEBL), नूरपुर मंडल',
@@ -1860,43 +1874,51 @@ Return only the clean transcription text in Hindi script without preamble or not
 
   app.post('/api/letters/generate', (req: Request, res: Response) => {
     try {
-      const { citizenName, guardianName, villageOrWard, mobile, category, details } = req.body;
-      if (!citizenName || !villageOrWard) {
-        res.status(400).json({ success: false, error: 'Citizen name and ward are required' });
+      const { citizenName, guardianName, address, villageOrWard, wardNo, mobile, category, purposeType, details, customNote } = req.body;
+      const citizenAddress = address || villageOrWard || (wardNo ? `वार्ड ${wardNo}, नूरपुर` : 'नूरपुर, कांगड़ा');
+
+      if (!citizenName) {
+        res.status(400).json({ success: false, error: 'Citizen name is required' });
         return;
       }
 
       const serial = 1000 + generatedMlaLetters.length + Math.floor(Math.random() * 50);
-      const dispatchNo = `RSN/MLA/2026/${serial}`;
+      const dispatchNo = `RSN/MLA-NURPUR/2026/${serial}`;
 
       let targetOfficer = 'उपमंडल अधिकारी (नागरिक) / SDM';
       let targetDepartment = 'प्रशासनिक कार्यालय, नूरपुर';
-      let subject = `नागरिक जनहित कार्य संस्तुति - ${villageOrWard}`;
+      let subject = `नागरिक जनहित कार्य संस्तुति - ${citizenAddress}`;
 
-      if (category?.includes('विद्युत') || category?.includes('ट्रांसफार्मर')) {
+      const pType = purposeType || (category?.includes('विद्युत') ? 'TRANSFORMER' : category?.includes('पेयजल') ? 'WATER_PIPELINE' : category?.includes('सड़क') ? 'ROAD_DANGA' : category?.includes('राहत') ? 'MEDICAL_AID' : 'GENERAL');
+
+      if (pType === 'TRANSFORMER' || category?.includes('विद्युत') || category?.includes('ट्रांसफार्मर')) {
         targetOfficer = 'अधिशासी अभियंता (XEN)';
         targetDepartment = 'हिमाचल प्रदेश विद्युत बोर्ड (HPSEBL), नूरपुर मंडल';
-        subject = `विद्युत आपूर्ति सुदृढ़ीकरण एवं ट्रांसफार्मर क्षमता वृद्धि - ${villageOrWard}`;
-      } else if (category?.includes('पेयजल') || category?.includes('पाइपलाइन')) {
+        subject = `विद्युत आपूर्ति सुदृढ़ीकरण एवं ट्रांसफार्मर क्षमता वृद्धि - ${citizenAddress}`;
+      } else if (pType === 'WATER_PIPELINE' || category?.includes('पेयजल') || category?.includes('पाइपलाइन')) {
         targetOfficer = 'अधिशासी अभियंता (XEN)';
         targetDepartment = 'जल शक्ति विभाग, नूरपुर मंडल';
-        subject = `पेयजल पाइपलाइन बिछाने व कूहल जीर्णोद्धार संस्तुति - ${villageOrWard}`;
-      } else if (category?.includes('सड़क') || category?.includes('डंगा') || category?.includes('पुल')) {
+        subject = `पेयजल पाइपलाइन बिछाने व कूहल जीर्णोद्धार संस्तुति - ${citizenAddress}`;
+      } else if (pType === 'ROAD_DANGA' || category?.includes('सड़क') || category?.includes('डंगा') || category?.includes('पुल')) {
         targetOfficer = 'अधिशासी अभियंता (XEN)';
         targetDepartment = 'लोक निर्माण विभाग (PWD), नूरपुर मंडल';
-        subject = `सड़क सुधारीकरण, सोलिंग एवं बाढ़ सुरक्षा डंगा निर्माण - ${villageOrWard}`;
-      } else if (category?.includes('राहत') || category?.includes('चिकित्सा') || category?.includes('बीमारी')) {
-        targetOfficer = 'माननीय मुख्यमंत्री महोदय (द्वारा सचिव)';
-        targetDepartment = 'मुख्यमंत्री राहत कोष (CMRF), हिमाचल प्रदेश सचिवालय';
+        subject = `सड़क सुधारीकरण, सोलिंग एवं बाढ़ सुरक्षा डंगा निर्माण - ${citizenAddress}`;
+      } else if (pType === 'MEDICAL_AID' || category?.includes('राहत') || category?.includes('चिकित्सा') || category?.includes('बीमारी')) {
+        targetOfficer = 'माननीय मुख्यमंत्री महोदय (द्वारा सचिव) / मुख्य चिकित्सा अधिकारी (CMO)';
+        targetDepartment = 'मुख्यमंत्री राहत कोष (CMRF) / स्वास्थ्य विभाग नूरपुर';
         subject = `आर्थिक रूप से कमजोर नागरिक हेतु गंभीर बीमारी चिकित्सा सहायता संस्तुति`;
+      } else if (pType === 'SCHOOL_FEE') {
+        targetOfficer = 'उप निदेशक (उच्चतर शिक्षा), कांगड़ा / SDM नूरपुर';
+        targetDepartment = 'शिक्षा विभाग, नूरपुर';
+        subject = `मेधावी व निर्धन छात्र हेतु विशेष छात्रवृत्ति / शिक्षण सहायता संस्तुति`;
       }
 
       const letterBodyHindi = `महोदय,
 सादर अभिवादन। 
 
-विधानसभा क्षेत्र 142-नूरपुर के अंतर्गत ${villageOrWard} के सम्मानित नागरिक श्री/श्रीमती ${citizenName} ${guardianName ? `(आत्मज/पत्नी: ${guardianName})` : ''} द्वारा कैंप कार्यालय नूरपुर में व्यक्तिगत रूप से उपस्थित होकर उक्त विषयक समस्या से अवगत कराया गया है। 
+विधानसभा क्षेत्र 142-नूरपुर के अंतर्गत ${citizenAddress} के सम्मानित नागरिक श्री/श्रीमती ${citizenName} ${guardianName ? `(आत्मज/पत्नी: ${guardianName})` : ''} द्वारा कैंप कार्यालय नूरपुर में व्यक्तिगत रूप से उपस्थित होकर उक्त विषयक समस्या से अवगत कराया गया है। 
 
-प्रार्थी के अनुसार: "${details || `${category} के संबंध में तत्काल विभागीय हस्तक्षेप अपेक्षित है जिससे जनसामान्य को राहत मिल सके।`}"
+प्रार्थी के अनुसार: "${customNote || details || `${category || pType} के संबंध में तत्काल विभागीय हस्तक्षेप अपेक्षित है जिससे जनसामान्य को राहत मिल सके।`}"
 
 चूंकि यह कार्य जनहित तथा स्थानीय ग्रामीणों की मूलभूत आवश्यकता से सीधा जुड़ा है, अतः मेरी संस्तुति है कि संबंधित स्थल का अविलंब तकनीकी निरीक्षण करवाकर नियमानुसार प्राथमिकता के आधार पर समाधान सुनिश्चित किया जाए। 
 
@@ -1906,9 +1928,10 @@ Return only the clean transcription text in Hindi script without preamble or not
         dispatchNo,
         citizenName,
         guardianName: guardianName || 'श्री राम शरण',
-        villageOrWard,
+        villageOrWard: citizenAddress,
         mobile: mobile || '98160*****',
-        category: category || 'जनहित संस्तुति',
+        category: category || pType,
+        purposeType: pType,
         subject,
         targetOfficer,
         targetDepartment,
@@ -1919,7 +1942,7 @@ Return only the clean transcription text in Hindi script without preamble or not
 
       generatedMlaLetters.unshift(newLetter);
 
-      console.log(`[MLA Recommendation Letter] Generated ${dispatchNo} for ${citizenName} (${villageOrWard})`);
+      console.log(`[MLA Recommendation Letter] Generated ${dispatchNo} for ${citizenName} (${citizenAddress})`);
 
       res.json({
         success: true,
@@ -1981,19 +2004,51 @@ Return only the clean transcription text in Hindi script without preamble or not
     alertsSent: 1420
   };
 
-  app.get('/api/padyatra/live', (_req: Request, res: Response) => {
-    // Calculate distance to all known ward centroids
-    const proximityAlerts = NURPUR_WARD_CENTROIDS.map(w => {
-      const dist = getDistanceKm(padyatraBeaconState.currentLat, padyatraBeaconState.currentLng, w.lat, w.lng);
+  function checkAndTriggerGeofenceAlerts(lat: number, lng: number) {
+    return NURPUR_WARD_CENTROIDS.map(w => {
+      const dist = getDistanceKm(lat, lng, w.lat, w.lng);
+      const isApproaching = dist <= 2.0;
+      const smsSentCount = isApproaching ? Math.floor(w.population * 0.45) : 0;
+
+      if (isApproaching) {
+        const tokenKey = `PADYATRA-W${w.wardNo}`;
+        const alreadyLogged = initialWhatsAppLogs.some(
+          log => log.ticketToken === tokenKey && log.message.includes(w.name)
+        );
+
+        if (!alreadyLogged) {
+          const alertMsg = `अलर्ट: विधायक रणबीर सिंह निक्का जी का काफिला आपके वार्ड ${w.wardNo} (${w.name}) से मात्र ${dist} किमी दूरी पर है। जनसंवाद 15-20 मिनट में प्रारंभ होगा।`;
+          initialWhatsAppLogs.unshift({
+            id: `wa-padyatra-${w.wardNo}-${Date.now().toString().slice(-4)}`,
+            ticketToken: tokenKey,
+            recipientPhone: `+91 94180-W${w.wardNo}XX (नागरिक दल)`,
+            citizenName: `वार्ड ${w.wardNo} (${w.name}) निवासी`,
+            templateType: 'CUSTOM',
+            message: alertMsg,
+            status: 'DELIVERED',
+            timestamp: 'आज, ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+          });
+          padyatraBeaconState.alertsSent += smsSentCount;
+          console.log(`[Padyatra Geofence] Triggered WhatsApp alert for Ward ${w.wardNo} (${dist} km away): ${alertMsg}`);
+        }
+      }
+
       return {
         wardNo: w.wardNo,
         name: w.name,
         nameEn: w.nameEn,
         distanceKm: dist,
-        isApproaching: dist <= 2.0, // Alert radius < 2km
-        smsSentCount: dist <= 2.0 ? Math.floor(w.population * 0.45) : 0
+        isApproaching,
+        smsSentCount
       };
     });
+  }
+
+  app.get('/api/padyatra/live', (_req: Request, res: Response) => {
+    const proximityAlerts = checkAndTriggerGeofenceAlerts(
+      padyatraBeaconState.currentLat, 
+      padyatraBeaconState.currentLng
+    );
 
     res.json({
       success: true,
@@ -2019,11 +2074,19 @@ Return only the clean transcription text in Hindi script without preamble or not
       if (announcement) padyatraBeaconState.announcement = announcement;
       padyatraBeaconState.lastUpdated = new Date().toISOString();
 
+      const proximityAlerts = checkAndTriggerGeofenceAlerts(
+        padyatraBeaconState.currentLat, 
+        padyatraBeaconState.currentLng
+      );
+
       console.log(`[Padyatra Beacon] Updated GPS: ${padyatraBeaconState.currentLat}, ${padyatraBeaconState.currentLng} (${padyatraBeaconState.currentLocationName})`);
 
       res.json({
         success: true,
-        beacon: padyatraBeaconState
+        beacon: {
+          ...padyatraBeaconState,
+          proximityAlerts
+        }
       });
     } catch (err: any) {
       console.error('Error in /api/padyatra/beacon:', err);
@@ -2103,6 +2166,106 @@ ${cachedDailyBulletin.scheduleSummary}
         audioBase64: '',
         durationSeconds: 58
       });
+    }
+  });
+
+  // ============================================================================
+  // 6. VIP CORPORATE ERP & INTELLIGENCE WAR ROOM ROUTES (RANBIR SINGH NIKKA)
+  // ============================================================================
+
+  // In-memory Trust Fund state
+  let serverTrustGrants = [
+    {
+      id: 'NJT-2026-0841',
+      recipientName: 'सुनीता देवी (पुत्री विवाह)',
+      guardianName: 'कर्म चंद',
+      boothNo: 41,
+      wardNo: 7,
+      village: 'भदवार (Bhadwar)',
+      mobile: '9816041234',
+      grantType: 'DAUGHTER_MARRIAGE',
+      amountRupees: 51000,
+      chequeOrTxnRef: 'PVI-HDFC-99214',
+      paymentMode: 'CHEQUE_HANDOVER',
+      dateGranted: '2026-02-14',
+      extendedFamilyVotersCount: 18,
+      status: 'DISBURSED'
+    },
+    {
+      id: 'NJT-2026-0842',
+      recipientName: 'मंगत राम (हार्ट सर्जरी सहायता)',
+      guardianName: 'स्व. ध्यान सिंह',
+      boothNo: 18,
+      wardNo: 3,
+      village: 'जसूर (Jasur)',
+      mobile: '9418088912',
+      grantType: 'MEDICAL_EMERGENCY',
+      amountRupees: 75000,
+      chequeOrTxnRef: 'NEFT-SBIN20260218-01',
+      paymentMode: 'DIRECT_BANK_TRANSFER',
+      dateGranted: '2026-02-18',
+      extendedFamilyVotersCount: 14,
+      status: 'VERIFIED'
+    }
+  ];
+
+  app.get('/api/trust-fund/ledger', (_req: Request, res: Response) => {
+    res.json({
+      success: true,
+      grants: serverTrustGrants,
+      metrics: {
+        totalDisbursedRupees: 38245000,
+        totalBeneficiariesCount: 4820,
+        extendedVotersLockedCount: 19280,
+        boothSaturationPercent: 96.6
+      }
+    });
+  });
+
+  app.post('/api/trust-fund/grant', (req: Request, res: Response) => {
+    try {
+      const grant = {
+        id: `NJT-2026-${Math.floor(850 + Math.random() * 150)}`,
+        ...req.body,
+        dateGranted: new Date().toISOString().split('T')[0],
+        status: 'DISBURSED'
+      };
+      serverTrustGrants.unshift(grant);
+      res.json({ success: true, grant });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.get('/api/booths/sentiment-map', (_req: Request, res: Response) => {
+    res.json({
+      success: true,
+      totalBooths: 118,
+      strongholdBooths: 74,
+      swingBooths: 31,
+      vulnerableBooths: 13,
+      estimatedLeadVotes: 18450
+    });
+  });
+
+  app.post('/api/vip/broadcast-voice', (req: Request, res: Response) => {
+    try {
+      const { audience, script } = req.body;
+      let count = 35240;
+      if (audience === 'SWING_BOOTHS') count = 12480;
+      if (audience === 'NIJAAT_FAMILIES') count = 4820;
+      if (audience === 'PANNA_PRAMUKHS') count = 1180;
+
+      res.json({
+        success: true,
+        dispatchedCount: count,
+        audience,
+        scriptSummary: script?.substring(0, 60) + '...',
+        deliveryRatePct: 99.4,
+        timestamp: new Date().toISOString()
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 

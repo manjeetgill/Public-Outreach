@@ -13,7 +13,8 @@ import {
   Vote
 } from 'lucide-react';
 import { VoterSlipData, Language } from '../../types/campaign';
-import { lookupVoterSlip, generateVoterWhatsAppMessage } from '../../services/voterLookup';
+import { MLA_INFO } from '../../data/campaignData';
+import { lookupVoterSlip, generateVoterWhatsAppMessage, EnrichedVoterRecord } from '../../services/voterLookup';
 
 interface VoterSlipModalProps {
   isOpen: boolean;
@@ -27,7 +28,7 @@ export const VoterSlipModal: React.FC<VoterSlipModalProps> = ({
   lang
 }) => {
   const [searchQuery, setSearchQuery] = useState('HP/142/089421');
-  const [slipData, setSlipData] = useState<VoterSlipData | null>(null);
+  const [slipData, setSlipData] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -51,13 +52,18 @@ export const VoterSlipModal: React.FC<VoterSlipModalProps> = ({
 
   const handleShareWhatsApp = () => {
     if (!slipData) return;
-    const msg = generateVoterWhatsAppMessage(slipData);
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
+    const voter = slipData;
+    const station = voter.pollingStationName || voter.boothName;
+    const lat = voter.lat || voter.gpsCoordinates?.lat || 32.3021;
+    const lng = voter.lng || voter.gpsCoordinates?.lng || 75.8920;
+    const shareText = `*विधानसभा 142 नूरपुर • डिजिटल मतदाता पर्ची*\n\n👤 *मतदाता:* ${voter.name}\n🔢 *क्रम संख्या (Serial No):* ${voter.serialNo}\n🏛️ *मतदान केंद्र:* ${station}\n📍 *बूथ का रास्ता (Google Maps):* https://maps.google.com/?q=${lat},${lng}\n\n*जनसेवक रणबीर सिंह निक्का* - मतदान अवश्य करें!`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank');
   };
 
   const handlePrint = () => {
     window.print();
   };
+
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -148,23 +154,33 @@ export const VoterSlipModal: React.FC<VoterSlipModalProps> = ({
                 id="printable-voter-slip"
                 className="bg-white border-2 border-slate-900 rounded-2xl p-4 shadow-md text-slate-900 relative overflow-hidden"
               >
+                {/* Tiranga Accent Strip */}
+                <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-slate-200 to-green-600 mb-3 rounded-full"></div>
+
                 {/* Official Banner Header */}
-                <div className="border-b-2 border-slate-900 pb-2.5 mb-3 flex items-center justify-between">
-                  <div>
-                    <span className="bg-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-sm uppercase tracking-wider">
-                      🇮🇳 आधिकारिक मतदाता सूचना पर्ची
-                    </span>
-                    <h4 className="text-sm font-black text-slate-950 mt-1">
-                      {slipData.assemblyConstituency}
-                    </h4>
-                    <p className="text-[10px] text-slate-600 font-bold">
-                      विधायक प्रत्याशी: {slipData.candidateName} (जनसेवक)
-                    </p>
+                <div className="border-b-2 border-slate-900 pb-2.5 mb-3 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <img 
+                      src={MLA_INFO.photoUrl} 
+                      alt={MLA_INFO.name} 
+                      className="w-12 h-12 rounded-full object-cover border-2 border-amber-500 shrink-0 shadow-xs" 
+                    />
+                    <div>
+                      <span className="bg-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-sm uppercase tracking-wider">
+                        🇮🇳 आधिकारिक मतदाता सूचना पर्ची
+                      </span>
+                      <h4 className="text-sm font-black text-slate-950 mt-0.5">
+                        {slipData.assemblyConstituency}
+                      </h4>
+                      <p className="text-[10px] text-slate-600 font-bold">
+                        विधायक: {MLA_INFO.name} (जनसेवक)
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="w-14 h-14 bg-slate-100 border border-slate-300 rounded-lg flex flex-col items-center justify-center p-1 text-center shrink-0">
-                    <QrCode className="w-8 h-8 text-slate-800" />
-                    <span className="text-[8px] font-mono font-bold text-slate-600 mt-0.5">सत्यापित</span>
+                  <div className="w-12 h-12 bg-slate-100 border border-slate-300 rounded-lg flex flex-col items-center justify-center p-1 text-center shrink-0">
+                    <QrCode className="w-6 h-6 text-slate-800" />
+                    <span className="text-[7px] font-mono font-bold text-slate-600">सत्यापित</span>
                   </div>
                 </div>
 

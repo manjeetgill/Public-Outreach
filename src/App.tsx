@@ -172,6 +172,7 @@ export default function App() {
               {currentTab === 'screen-nivaran' && (
                 <NivaranScreen 
                   onOpenComplaintModal={() => setIsComplaintModalOpen(true)} 
+                  onOpenMlaLetter={() => setIsMlaLetterOpen(true)}
                   grievances={grievances} 
                   lang={lang} 
                 />
@@ -195,7 +196,11 @@ export default function App() {
               )}
               {currentTab === 'screen-admin' && (
                 <div className="p-2">
-                  <AdminScreen lang={lang} onBackToOverview={() => handleSelectTab('screen-home')} />
+                  <AdminScreen 
+                    lang={lang} 
+                    onBackToOverview={() => handleSelectTab('screen-home')} 
+                    onOpenMlaLetter={() => setIsMlaLetterOpen(true)}
+                  />
                 </div>
               )}
             </main>
@@ -222,6 +227,7 @@ export default function App() {
               onOpenVoiceDesk={() => setIsVoiceDeskOpen(true)} 
               onOpenComplaintModal={() => setIsComplaintModalOpen(true)} 
               onOpenAuthModal={() => setIsAuthModalOpen(true)}
+              onOpenVoterSlip={() => setIsVoterSlipOpen(true)}
               currentUser={currentUser}
             />
 
@@ -330,6 +336,7 @@ export default function App() {
                 <div className="space-y-6">
                   <NivaranScreen 
                     onOpenComplaintModal={() => setIsComplaintModalOpen(true)} 
+                    onOpenMlaLetter={() => setIsMlaLetterOpen(true)}
                     grievances={grievances} 
                     lang={lang} 
                   />
@@ -360,7 +367,11 @@ export default function App() {
 
               {currentTab === 'screen-admin' && (
                 <div className="space-y-6">
-                  <AdminScreen lang={lang} onBackToOverview={() => handleSelectTab('screen-home')} />
+                  <AdminScreen 
+                    lang={lang} 
+                    onBackToOverview={() => handleSelectTab('screen-home')} 
+                    onOpenMlaLetter={() => setIsMlaLetterOpen(true)}
+                  />
                 </div>
               )}
 

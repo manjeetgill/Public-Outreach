@@ -8,7 +8,8 @@ import {
   AlertCircle, 
   User, 
   Calendar,
-  Share2
+  Share2,
+  Sparkles
 } from 'lucide-react';
 import { Language, GrievanceTicket } from '../../types/campaign';
 import { CITIZEN_TICKETS_MOCK, CitizenTicketItem } from '../../data/campaignData';
@@ -16,12 +17,14 @@ import { CITIZEN_TICKETS_MOCK, CitizenTicketItem } from '../../data/campaignData
 interface CitizenDashboardSectionProps {
   lang: Language;
   onOpenReportModal?: () => void;
+  onOpenYojanaModal?: () => void;
   userTickets?: GrievanceTicket[];
 }
 
 export const CitizenDashboardSection: React.FC<CitizenDashboardSectionProps> = ({
   lang,
   onOpenReportModal,
+  onOpenYojanaModal,
   userTickets = []
 }) => {
   const [activeTab, setActiveTab] = useState<'requests' | 'participation' | 'events' | 'profile'>('requests');
@@ -30,6 +33,39 @@ export const CitizenDashboardSection: React.FC<CitizenDashboardSectionProps> = (
   return (
     <div className="bg-white rounded-3xl border border-slate-200/90 shadow-md p-5 sm:p-7 space-y-6">
       
+      {/* 0. Sarkari Yojana Eligibility Engine Banner */}
+      <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-2xl p-4 sm:p-5 text-white shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="bg-white/20 backdrop-blur-xs text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-amber-200" />
+              <span>AI कल्याणकारी योजना साथी</span>
+            </span>
+            <span className="text-xs bg-amber-200 text-amber-950 font-black px-2 py-0.5 rounded-full">
+              8+ योजनाएं
+            </span>
+          </div>
+          <h4 className="text-base sm:text-lg font-black text-white">
+            {lang === 'hi' 
+              ? 'पात्रता जांचें: मुझे कौन सी सरकारी योजना मिल सकती है?' 
+              : 'Check Welfare Eligibility: Which Government Schemes Apply to Me?'}
+          </h4>
+          <p className="text-xs text-amber-100 max-w-xl leading-relaxed">
+            {lang === 'hi'
+              ? 'सुख आश्रय, प्यारी बहना ₹1500, प्राकृतिक खेती, स्वावलंबन और कन्यादान योजना हेतु 3 आसान प्रश्नों में अपनी पात्रता तुरंत जांचें।'
+              : 'Instant evaluation for Sukh Aashray, Pyari Behna ₹1500/mo, Prakritik Kheti & Swavalamban in 3 quick questions.'}
+          </p>
+        </div>
+        {onOpenYojanaModal && (
+          <button
+            onClick={onOpenYojanaModal}
+            className="whitespace-nowrap px-4 py-2.5 bg-slate-900 hover:bg-black text-amber-300 font-extrabold text-xs rounded-xl shadow-lg transition active:scale-95 flex items-center gap-1.5 shrink-0"
+          >
+            <span>{lang === 'hi' ? 'अपनी पात्रता जांचें →' : 'Check Eligibility →'}</span>
+          </button>
+        )}
+      </div>
+
       {/* Header matching Card 7 */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
         <div>

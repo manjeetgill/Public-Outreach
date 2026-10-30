@@ -247,11 +247,11 @@ export const PannaPramukhScreen: React.FC<PannaPramukhScreenProps> = ({ lang }) 
           </div>
         </div>
 
-        {/* Booth Selector & Sync Controls */}
+        {/* Booth Selector, Download Pack, and Readiness Status */}
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 mt-3 pt-3 border-t border-slate-700/60">
-          <div className="sm:col-span-7 flex items-center gap-2">
+          <div className="sm:col-span-6 flex items-center gap-2">
             <label className="text-xs text-slate-300 font-bold shrink-0">
-              {lang === 'hi' ? 'बूथ चुनें:' : 'Select Booth:'}
+              {lang === 'hi' ? 'बूथ चुनें (1–118):' : 'Select Booth (1-118):'}
             </label>
             <div className="relative flex-1">
               <select
@@ -260,32 +260,59 @@ export const PannaPramukhScreen: React.FC<PannaPramukhScreenProps> = ({ lang }) 
                 aria-label={lang === 'hi' ? 'बूथ चुनें' : 'Select Polling Booth'}
                 className="w-full bg-slate-900/90 text-white text-xs font-semibold px-3 py-2 rounded-xl border border-slate-600 focus:outline-hidden focus:border-amber-400 appearance-none pr-8 cursor-pointer"
               >
-                <option value={41}>बूथ 41: राजकीय व.मा.वि. भदवार (वार्ड 08)</option>
-                <option value={42}>बूथ 42: राजकीय प्रा.पा. जसूर (वार्ड 01)</option>
-                <option value={88}>बूथ 88: राजकीय उच्च विद्यालय, रेहन (वार्ड 12)</option>
-                <option value={15}>बूथ 15: राजकीय मॉडल स्कूल, कोटला (वार्ड 15)</option>
+                {Array.from({ length: 118 }, (_, i) => i + 1).map((b) => {
+                  const boothName = b === 41 
+                    ? 'बूथ 41: राजकीय व.मा.वि. भदवार (कमरा 1)' 
+                    : b === 42 
+                    ? 'बूथ 42: राजकीय प्रा.पा. जसूर (कमरा 2)' 
+                    : b === 88 
+                    ? 'बूथ 88: राजकीय उच्च विद्यालय, रेहन' 
+                    : b === 15 
+                    ? 'बूथ 15: राजकीय मॉडल स्कूल, कोटला' 
+                    : b === 1
+                    ? 'बूथ 01: राजकीय प्राथमिक पाठशाला, जसूर'
+                    : b === 118
+                    ? 'बूथ 118: राजकीय प्रा.वि. जाफरपुर (सीमांत)'
+                    : `बूथ ${b.toString().padStart(2, '0')}: राजकीय प्राथमिक/माध्यमिक विद्यालय (वार्ड ${((b - 1) % 24) + 1})`;
+                  return (
+                    <option key={b} value={b}>
+                      {boothName}
+                    </option>
+                  );
+                })}
               </select>
               <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
             </div>
           </div>
 
-          <div className="sm:col-span-5 flex items-center gap-2">
+          <div className="sm:col-span-6 flex flex-wrap items-center gap-2">
+            {/* Download Offline Pack Button */}
+            <button
+              onClick={() => loadBoothData(selectedBooth)}
+              className="flex-1 py-2 px-3 bg-sky-600 hover:bg-sky-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
+              title="बूथ का संपूर्ण मतदाता डेटा स्थानीय IndexedDB में सुरक्षित करें"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>डाउनलोड बूथ डेटा (Download Pack)</span>
+            </button>
+
+            {/* Offline Readiness Status Badge */}
+            <div className={`px-2.5 py-1.5 rounded-xl text-[10px] font-black border flex items-center gap-1 shrink-0 ${
+              voters.length > 0 
+                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50' 
+                : 'bg-rose-950/80 text-rose-300 border-rose-500/50'
+            }`}>
+              <span>{voters.length > 0 ? '🟢 ऑफलाइन तैयार' : '🔴 ऑनलाइन आवश्यक'}</span>
+            </div>
+
+            {/* Sync Batch Button */}
             <button
               onClick={handleSyncNow}
               disabled={isSyncing}
-              className="flex-1 py-2 px-3 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-700 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
+              className="py-2 px-3 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-700 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'सिंक हो रहा है...' : 'डेटा सिंक करें'}</span>
-            </button>
-
-            <button
-              onClick={() => setIsDoorstepModalOpen(true)}
-              className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition shadow-sm cursor-pointer"
-              title="डोरस्टेप मांग दर्ज करें"
-            >
-              <PlusCircle className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">डोरस्टेप मांग</span>
+              <span>{isSyncing ? 'सिंक...' : 'सिंक करें'}</span>
             </button>
           </div>
         </div>
@@ -450,7 +477,7 @@ export const PannaPramukhScreen: React.FC<PannaPramukhScreenProps> = ({ lang }) 
                     }`}
                   >
                     <CheckCircle className={`w-4 h-4 ${voter.isTurnoutMarked ? 'text-white' : 'text-amber-400'}`} />
-                    <span>{voter.isTurnoutMarked ? 'मतदान दर्ज ✓' : 'मतदान दर्ज करें'}</span>
+                    <span>{voter.isTurnoutMarked ? 'मतदान किया ✓' : 'मतदान किया (Mark Voted)'}</span>
                   </button>
 
                   <div className="flex items-center gap-1">
@@ -593,6 +620,17 @@ export const PannaPramukhScreen: React.FC<PannaPramukhScreenProps> = ({ lang }) 
           </div>
         </div>
       )}
+
+      {/* Floating Doorstep Petition Button */}
+      <div className="fixed bottom-24 right-4 sm:right-8 z-40">
+        <button
+          onClick={() => setIsDoorstepModalOpen(true)}
+          className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-extrabold text-xs px-4 py-3 rounded-full shadow-2xl flex items-center gap-2 border-2 border-white/40 transition transform active:scale-95 cursor-pointer"
+        >
+          <PlusCircle className="w-4 h-4 text-white" />
+          <span>घर-द्वार शिकायत (Doorstep Petition)</span>
+        </button>
+      </div>
     </div>
   );
 };

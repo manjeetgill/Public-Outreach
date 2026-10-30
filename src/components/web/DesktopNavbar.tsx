@@ -29,6 +29,7 @@ interface DesktopNavbarProps {
   onOpenVoiceDesk: () => void;
   onOpenComplaintModal: () => void;
   onOpenAuthModal?: () => void;
+  onOpenVoterSlip?: () => void;
   currentUser?: string | null;
 }
 
@@ -42,6 +43,7 @@ export const DesktopNavbar: React.FC<DesktopNavbarProps> = ({
   onOpenVoiceDesk,
   onOpenComplaintModal,
   onOpenAuthModal,
+  onOpenVoterSlip,
   currentUser
 }) => {
   return (
@@ -273,6 +275,18 @@ export const DesktopNavbar: React.FC<DesktopNavbarProps> = ({
             >
               <span className={`w-2 h-2 rounded-full ${currentUser ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
               <span className="max-w-[80px] truncate">{currentUser ? currentUser : (lang === 'hi' ? 'नागरिक लॉगिन' : 'Citizen OTP')}</span>
+            </button>
+          )}
+
+          {/* Voter Slip Quick Action */}
+          {onOpenVoterSlip && (
+            <button
+              onClick={onOpenVoterSlip}
+              className="px-3 py-2 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 rounded-xl text-xs font-black flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+              title="डिजिटल मतदाता पर्ची व पोलिंग स्टेशन मार्ग खोजें"
+            >
+              <span>🪪</span>
+              <span>{lang === 'hi' ? 'मेरी मतदाता पर्ची खोजें' : 'Find My Voter Slip'}</span>
             </button>
           )}
 
