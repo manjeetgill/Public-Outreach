@@ -26,6 +26,7 @@ import { VolunteerRegisterModal } from './components/modals/VolunteerRegisterMod
 import { MediaPreviewModal } from './components/modals/MediaPreviewModal';
 import { JanadeshChatbotModal } from './components/modals/JanadeshChatbotModal';
 import { AiVideoStudioModal } from './components/modals/AiVideoStudioModal';
+import { AuthModal } from './components/modals/AuthModal';
 import { Bot, Video, Sparkles } from 'lucide-react';
 
 import { INITIAL_GRIEVANCES } from './data/campaignData';
@@ -44,6 +45,8 @@ export default function App() {
   const [isVolunteerModalOpen, setIsVolunteerModalOpen] = useState(false);
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [isVideoStudioOpen, setIsVideoStudioOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [previewMediaItem, setPreviewMediaItem] = useState<MediaKitItem | null>(null);
 
   // Dynamic grievances state
@@ -196,6 +199,8 @@ export default function App() {
               onToggleFrameMode={handleToggleFrameMode} 
               onOpenVoiceDesk={() => setIsVoiceDeskOpen(true)} 
               onOpenComplaintModal={() => setIsComplaintModalOpen(true)} 
+              onOpenAuthModal={() => setIsAuthModalOpen(true)}
+              currentUser={currentUser}
             />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -408,6 +413,14 @@ export default function App() {
         isOpen={isVideoStudioOpen} 
         onClose={() => setIsVideoStudioOpen(false)} 
         lang={lang} 
+      />
+
+      {/* Citizen SMS & OTP Verification Modal (sms_service.py) */}
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+        lang={lang} 
+        onLoginSuccess={(name) => setCurrentUser(name)} 
       />
     </div>
   );

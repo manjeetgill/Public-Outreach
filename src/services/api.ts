@@ -177,9 +177,12 @@ export async function sendChatMessage(
 }
 
 /**
- * Audio Transcription using Gemini 3.5 Transcribe
+ * Audio Transcription using Gemini 3.5 Transcribe & Sarvam Indic Speech Engine
  */
-export async function transcribeAudio(audioBlob: Blob): Promise<string> {
+export async function transcribeAudio(
+  audioBlob: Blob,
+  options?: { dialectMode?: 'kangri' | 'standard_hindi'; speechProvider?: 'sarvam' | 'gemini' }
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = async () => {
@@ -190,7 +193,9 @@ export async function transcribeAudio(audioBlob: Blob): Promise<string> {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             audioBase64: base64Data,
-            mimeType: audioBlob.type || 'audio/webm'
+            mimeType: audioBlob.type || 'audio/webm',
+            dialectMode: options?.dialectMode || 'kangri',
+            speechProvider: options?.speechProvider || 'sarvam'
           })
         });
 
@@ -209,13 +214,17 @@ export async function transcribeAudio(audioBlob: Blob): Promise<string> {
 }
 
 /**
- * Text-to-Speech using Gemini 3.8 Flash Lite TTS
+ * Text-to-Speech using Gemini 3.8 Flash Lite TTS & Sarvam Indic Bulbul Engine
  */
-export async function synthesizeSpeech(text: string, voiceName: string = 'Zephyr'): Promise<string> {
+export async function synthesizeSpeech(
+  text: string, 
+  voiceName: string = 'Zephyr',
+  speechProvider: 'sarvam' | 'gemini' = 'sarvam'
+): Promise<string> {
   const res = await fetch(`${API_BASE}/ai/tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voiceName })
+    body: JSON.stringify({ text, voiceName, speechProvider })
   });
 
   const data = await res.json();
@@ -223,6 +232,159 @@ export async function synthesizeSpeech(text: string, voiceName: string = 'Zephyr
     throw new Error(data.error || 'TTS failed');
   }
   return `data:${data.mimeType};base64,${data.audioBase64}`;
+}
+
+/**
+ * Multimodal Vision Inspection for Grievance Photos (vision.py)
+ */
+export interface PhotoVerificationResult {
+  isAuthenticCivilDamage: boolean;
+  confidence: number;
+  severityRating: 'CRITICAL' | 'HIGH' | 'NORMAL';
+  suggestedCategory: string;
+  department: string;
+  technicalSummary: string;
+  technicalSummaryEn: string;
+  detectedIssues: string[];
+}
+
+export async function verifyGrievancePhoto(
+  imageBase64: string,
+  mimeType: string = 'image/jpeg'
+): Promise<PhotoVerificationResult> {
+  const res = await fetch(`${API_BASE}/ai/verify-photo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageBase64, mimeType })
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || 'Vision inspection failed');
+  }
+  return data.data;
+}
+
+/**
+ * Real SMS & OTP Verification Service (sms_service.py)
+ */
+export async function sendCitizenOtp(phone: string, name?: string): Promise<{
+  success: boolean;
+  message: string;
+  maskedPhone?: string;
+  debugOtp?: string;
+  expiresInSeconds?: number;
+}> {
+  const res = await fetch(`${API_BASE}/auth/send-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, name })
+  });
+  return await res.json();
+}
+
+export async function verifyCitizenOtp(phone: string, otp: string, name?: string): Promise<{
+  success: boolean;
+  message?: string;
+  token?: string;
+  user?: { phone: string; name: string; role: string; verifiedAt: string };
+}> {
+  const res = await fetch(`${API_BASE}/auth/verify-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, otp, name })
+  });
+  return await res.json();
+}
+
+/**
+ * Outbound WhatsApp Alerts Logs (whatsapp_worker.py)
+ */
+export interface WhatsAppAlertLog {
+  id: string;
+  ticketToken: string;
+  recipientPhone: string;
+  citizenName: string;
+  templateType: string;
+  message: string;
+  status: 'DELIVERED' | 'READ' | 'PENDING';
+  timestamp: string;
+}
+
+export async function fetchWhatsAppOutboundLogs(): Promise<WhatsAppAlertLog[]> {
+  try {
+    const res = await fetch(`${API_BASE}/whatsapp/outbound-logs`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.data || [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * War Room Autonomous SLA Status & Briefing (automation.py)
+ */
+export interface WarRoomSlaStatus {
+  totalPending: number;
+  breachedCount: number;
+  slaLimitHours: number;
+  breachedTickets: Array<{
+    token: string;
+    wardNo: number;
+    title: string;
+    citizenName: string;
+    submittedDate: string;
+    ageHours: number;
+  }>;
+}
+
+export async function fetchWarRoomSlaStatus(): Promise<WarRoomSlaStatus | null> {
+  try {
+    const res = await fetch(`${API_BASE}/war-room/sla-status`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchWarRoomExecutiveBriefing(): Promise<{
+  success: boolean;
+  generatedAt: string;
+  briefing: string;
+  stats: any;
+} | null> {
+  try {
+    const res = await fetch(`${API_BASE}/war-room/briefing`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function generateDepartmentRequisitionMemo(
+  ticketToken: string,
+  department?: string,
+  officerTitle?: string
+): Promise<{
+  success: boolean;
+  memoNumber: string;
+  date: string;
+  memoContent: string;
+} | null> {
+  try {
+    const res = await fetch(`${API_BASE}/war-room/generate-memo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticketToken, department, officerTitle })
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -244,4 +406,5 @@ export async function generateAiVideo(params: {
     return { success: false, error: err.message };
   }
 }
+
 

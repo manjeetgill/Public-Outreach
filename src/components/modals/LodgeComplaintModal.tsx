@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { X, Camera, AlertCircle, CheckCircle2, Upload, MapPin, Phone, User, Mic, MicOff, Loader2 } from 'lucide-react';
+import { X, Camera, AlertCircle, CheckCircle2, Upload, MapPin, Phone, User, Mic, MicOff, Loader2, Sparkles, ShieldCheck, AlertTriangle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { GrievanceTicket, Language } from '../../types/campaign';
-import { transcribeAudio } from '../../services/api';
+import { transcribeAudio, verifyGrievancePhoto, PhotoVerificationResult } from '../../services/api';
 
 interface LodgeComplaintModalProps {
   isOpen: boolean;
@@ -24,12 +24,44 @@ export const LodgeComplaintModal: React.FC<LodgeComplaintModalProps> = ({
   const [phone, setPhone] = useState('');
   const [description, setDescription] = useState('');
   const [photoSelected, setPhotoSelected] = useState<string | null>(null);
+  const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false);
+  const [visionResult, setVisionResult] = useState<PhotoVerificationResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [submittedToken, setSubmittedToken] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64Url = reader.result as string;
+      setPhotoSelected(base64Url);
+      setIsAnalyzingPhoto(true);
+
+      try {
+        const base64Data = base64Url.split(',')[1];
+        const result = await verifyGrievancePhoto(base64Data, file.type || 'image/jpeg');
+        setVisionResult(result);
+        if (result.suggestedCategory) {
+          setCategory(result.suggestedCategory);
+        }
+        if (result.technicalSummary && !description) {
+          setDescription(result.technicalSummary);
+        }
+      } catch (err) {
+        console.warn('Vision inspection error:', err);
+      } finally {
+        setIsAnalyzingPhoto(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const startRecording = async () => {
     try {
@@ -96,12 +128,15 @@ export const LodgeComplaintModal: React.FC<LodgeComplaintModalProps> = ({
       status: 'in-progress',
       submittedDate: 'अभी-अभी (Just now)',
       whatsappSubscribed: true,
+      photoUrl: photoSelected || undefined,
       timeline: [
         {
           title: lang === 'hi' ? 'शिकायत दर्ज (नागरिक द्वारा)' : 'Grievance Registered by Citizen',
           titleEn: 'Grievance Registered by Citizen',
           timestamp: 'आज, अभी',
-          description: lang === 'hi' ? 'डिजिटल नागरिक पोर्टल से सीधे पंजीकृत' : 'Registered directly via Digital Civic Portal',
+          description: visionResult 
+            ? (lang === 'hi' ? `AI विज़न ऑडिट पूर्ण: प्राथमिकता ${visionResult.severityRating} • विभाग: ${visionResult.department}` : `AI Vision Audit: Priority ${visionResult.severityRating} • Department: ${visionResult.department}`)
+            : (lang === 'hi' ? 'डिजिटल नागरिक पोर्टल से सीधे पंजीकृत' : 'Registered directly via Digital Civic Portal'),
           descriptionEn: 'Registered directly via Digital Civic Portal',
           status: 'done'
         },
@@ -357,30 +392,110 @@ export const LodgeComplaintModal: React.FC<LodgeComplaintModalProps> = ({
               />
             </div>
 
-            {/* Photo Attachment Simulation */}
-            <div 
-              onClick={() => setPhotoSelected(photoSelected ? null : 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=600&auto=format&fit=crop&q=80')}
-              className={`p-3 border-2 border-dashed rounded-xl text-center cursor-pointer transition ${
-                photoSelected ? 'border-emerald-500 bg-emerald-50/50' : 'border-slate-300 bg-slate-50 hover:bg-slate-100'
-              }`}
-            >
-              <div className="flex items-center justify-center gap-2 mb-1">
-                {photoSelected ? (
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                ) : (
-                  <Camera className="w-5 h-5 text-slate-400" />
-                )}
-                <p className="text-[11px] font-bold text-slate-700">
-                  {photoSelected 
-                    ? (lang === 'hi' ? 'फोटो संलग्न की गई (Geo-Tagged Photo Ready)' : 'Photo Attached')
-                    : (lang === 'hi' ? 'फोटो जोड़ें (Geo-tagged Photo)' : 'Attach Geo-tagged Photo')}
-                </p>
-              </div>
-              <p className="text-[9px] text-slate-500">
-                {photoSelected 
-                  ? (lang === 'hi' ? 'बदलने या हटाने के लिए क्लिक करें' : 'Click to toggle or remove')
-                  : (lang === 'hi' ? 'कैमरा या गैलरी से वास्तविक स्थिति की तस्वीर लगाएं' : 'Camera or gallery upload')}
-              </p>
+            {/* Real Photo Attachment & Multimodal Vision Audit (vision.py) */}
+            <div>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                accept="image/*" 
+                onChange={handlePhotoUpload} 
+                className="hidden" 
+              />
+              
+              {!photoSelected ? (
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-3 border-2 border-dashed border-slate-300 hover:border-orange-500 rounded-xl text-center cursor-pointer transition bg-slate-50 hover:bg-orange-50/40 group"
+                >
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <Camera className="w-5 h-5 text-slate-400 group-hover:text-orange-500 transition" />
+                    <p className="text-[11px] font-bold text-slate-700 group-hover:text-orange-700">
+                      {lang === 'hi' ? 'क्षतिग्रस्त स्थल की फोटो लगाएं (AI विज़न ऑडिट)' : 'Upload Grievance Photo (AI Vision Audit)'}
+                    </p>
+                  </div>
+                  <p className="text-[9px] text-slate-500">
+                    {lang === 'hi' ? 'कैमरा या गैलरी से वास्तविक तस्वीर चुनें • AI स्वतः श्रेणी व गंभीरता जांचेगा' : 'Select from camera or file • AI will automatically audit damage & verify'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2.5 p-2 bg-slate-50 rounded-xl border border-slate-200">
+                    <img 
+                      src={photoSelected} 
+                      alt="Uploaded preview" 
+                      className="w-16 h-16 object-cover rounded-lg border border-slate-300 shadow-xs" 
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-700 flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          {lang === 'hi' ? 'फोटो संलग्न' : 'Photo Attached'}
+                        </span>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setPhotoSelected(null);
+                            setVisionResult(null);
+                          }}
+                          className="text-[10px] text-rose-600 hover:underline font-semibold"
+                        >
+                          {lang === 'hi' ? 'हटाएं' : 'Remove'}
+                        </button>
+                      </div>
+                      <p className="text-[9px] text-slate-500 truncate mt-0.5">
+                        {lang === 'hi' ? 'नागरिक प्रमाण • Geo-Verified' : 'Citizen Proof • Geo-Verified'}
+                      </p>
+                      
+                      {isAnalyzingPhoto && (
+                        <div className="mt-1 flex items-center gap-1.5 text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                          <Loader2 className="w-3 h-3 animate-spin text-amber-600" />
+                          <span>{lang === 'hi' ? 'AI विज़न ऑडिट प्रगति पर है...' : 'AI Vision inspecting damage...'}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* AI Vision Verification Results Card */}
+                  {visionResult && !isAnalyzingPhoto && (
+                    <div className="p-2.5 bg-gradient-to-r from-slate-50 to-emerald-50/30 rounded-xl border border-emerald-200 space-y-1.5 animate-in fade-in duration-200">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="font-extrabold text-emerald-800 flex items-center gap-1">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          {visionResult.isAuthenticCivilDamage 
+                            ? (lang === 'hi' ? `✓ वास्तविक क्षति सत्यापित (${visionResult.confidence}% Confidence)` : `✓ Authentic Civil Defect (${visionResult.confidence}%)`)
+                            : (lang === 'hi' ? '⚠️ अप्रमाणित / सामान्य छवि' : '⚠️ Non-civil infrastructure image')}
+                        </span>
+                        
+                        {/* Severity Badge */}
+                        <span className={`px-2 py-0.5 rounded-full font-black text-[9px] uppercase tracking-wider ${
+                          visionResult.severityRating === 'CRITICAL' 
+                            ? 'bg-rose-100 text-rose-800 border border-rose-300 animate-pulse'
+                            : visionResult.severityRating === 'HIGH'
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                              : 'bg-blue-100 text-blue-900 border border-blue-200'
+                        }`}>
+                          {visionResult.severityRating === 'CRITICAL' ? 'अति-गंभीर (CRITICAL)' : visionResult.severityRating === 'HIGH' ? 'उच्च (HIGH)' : 'सामान्य (NORMAL)'}
+                        </span>
+                      </div>
+
+                      <div className="text-[10px] text-slate-700 flex flex-wrap items-center gap-1.5">
+                        <span className="bg-white px-2 py-0.5 rounded-md border border-slate-200 font-bold text-slate-800">
+                          {visionResult.department}
+                        </span>
+                        <span className="text-slate-500">
+                          {lang === 'hi' ? 'स्वतः श्रेणी आवंटित:' : 'Category Auto-assigned:'} <b>{visionResult.suggestedCategory}</b>
+                        </span>
+                      </div>
+
+                      {visionResult.technicalSummary && (
+                        <div className="bg-white/80 p-2 rounded-lg border border-slate-200 text-[10px] text-slate-600 italic">
+                          <p className="font-sans">"<b>{lang === 'hi' ? 'फील्ड इंजीनियर नोट' : 'Field Engineer Note'}:</b> {visionResult.technicalSummary}"</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Priority & WhatsApp alert badge */}

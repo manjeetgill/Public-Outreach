@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShieldAlert, 
   Download, 
@@ -31,11 +31,24 @@ import {
   Flame,
   Check,
   AlertTriangle,
-  ArrowLeft
+  ArrowLeft,
+  Loader2,
+  Copy,
+  Share2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { MLA_INFO } from '../../data/campaignData';
 import { WarRoomAuditEntry, CitizenInboundMessage, Language } from '../../types/campaign';
+import { 
+  fetchWhatsAppOutboundLogs, 
+  WhatsAppAlertLog, 
+  fetchWarRoomSlaStatus, 
+  WarRoomSlaStatus, 
+  fetchWarRoomExecutiveBriefing, 
+  generateDepartmentRequisitionMemo, 
+  synthesizeSpeech, 
+  updateGrievanceStatus 
+} from '../../services/api';
 
 interface AdminScreenProps {
   lang: Language;
@@ -49,6 +62,23 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview
   const [padyatraInput, setPadyatraInput] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // SLA Autonomous Agent & WhatsApp Worker state
+  const [slaStatus, setSlaStatus] = useState<WarRoomSlaStatus | null>(null);
+  const [whatsAppLogs, setWhatsAppLogs] = useState<WhatsAppAlertLog[]>([]);
+  const [isWhatsAppDrawerOpen, setIsWhatsAppDrawerOpen] = useState(false);
+  
+  // Daily Executive Briefing state
+  const [isBriefingModalOpen, setIsBriefingModalOpen] = useState(false);
+  const [briefingData, setBriefingData] = useState<{ briefing: string; stats: any; generatedAt: string } | null>(null);
+  const [isLoadingBriefing, setIsLoadingBriefing] = useState(false);
+  const [isPlayingBriefingVoice, setIsPlayingBriefingVoice] = useState(false);
+  const briefingAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Government Requisition Memo Generator state
+  const [memoModalData, setMemoModalData] = useState<{ memoNumber: string; memoContent: string; ticketToken: string; date: string } | null>(null);
+  const [isGeneratingMemo, setIsGeneratingMemo] = useState(false);
+  const [copiedMemo, setCopiedMemo] = useState(false);
+
   // Active Modals state
   const [activeMetricModal, setActiveMetricModal] = useState<string | null>(null);
   const [activeDecisionModal, setActiveDecisionModal] = useState<string | null>(null);
@@ -59,6 +89,24 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview
   // Audio simulation state for voice recordings
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
   const [replyDraft, setReplyDraft] = useState('');
+
+  // Initial load for SLA status and WhatsApp logs
+  useEffect(() => {
+    fetchWarRoomSlaStatus().then(data => {
+      if (data) setSlaStatus(data);
+    });
+
+    fetchWhatsAppOutboundLogs().then(logs => {
+      if (logs) setWhatsAppLogs(logs);
+    });
+
+    const interval = setInterval(() => {
+      fetchWarRoomSlaStatus().then(data => { if (data) setSlaStatus(data); });
+      fetchWhatsAppOutboundLogs().then(logs => { if (logs) setWhatsAppLogs(logs); });
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Live session audit log
   const [auditLog, setAuditLog] = useState<WarRoomAuditEntry[]>([
@@ -213,6 +261,113 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview
       return item;
     }));
     showToast(`${citizenName} को आधिकारिक संदेश सफलतापूर्वक प्रेषित: "${actionText}"`);
+  };
+
+  // 5A. FETCH AUTONOMOUS WAR ROOM DAILY BRIEFING (automation.py)
+  const handleFetchBriefing = async () => {
+    setIsLoadingBriefing(true);
+    try {
+      const data = await fetchWarRoomExecutiveBriefing();
+      if (data) {
+        setBriefingData(data);
+        setIsBriefingModalOpen(true);
+      } else {
+        showToast("कार्यकारी ब्रीफिंग प्राप्त करने में त्रुटि हुई।");
+      }
+    } catch {
+      showToast("सर्वर से संपर्क नहीं हो सका।");
+    } finally {
+      setIsLoadingBriefing(false);
+    }
+  };
+
+  // 5B. PLAY BRIEFING VOICE VIA SARVAM INDIC ENGINE (sarvam_speech.py)
+  const handlePlayBriefingVoice = async () => {
+    if (isPlayingBriefingVoice) {
+      if (briefingAudioRef.current) {
+        briefingAudioRef.current.pause();
+        briefingAudioRef.current = null;
+      }
+      setIsPlayingBriefingVoice(false);
+      return;
+    }
+
+    if (!briefingData?.briefing) return;
+    setIsPlayingBriefingVoice(true);
+    showToast("वॉयस ब्रीफिंग तैयार हो रही है (Sarvam Bulbul Engine)...");
+
+    try {
+      const cleanText = briefingData.briefing.replace(/[#*•]/g, '').slice(0, 450);
+      const audioUrl = await synthesizeSpeech(cleanText, 'Zephyr', 'sarvam');
+      const audio = new Audio(audioUrl);
+      briefingAudioRef.current = audio;
+      audio.onended = () => {
+        setIsPlayingBriefingVoice(false);
+        briefingAudioRef.current = null;
+      };
+      audio.onerror = () => {
+        setIsPlayingBriefingVoice(false);
+        briefingAudioRef.current = null;
+      };
+      await audio.play();
+    } catch {
+      setIsPlayingBriefingVoice(false);
+      showToast("ऑडियो चलाने में त्रुटि हुई।");
+    }
+  };
+
+  // 5C. GENERATE OFFICIAL GOVERNMENT REQUISITION MEMO (automation.py)
+  const handleGenerateMemo = async (token: string, dept?: string, officer?: string) => {
+    setIsGeneratingMemo(true);
+    try {
+      const result = await generateDepartmentRequisitionMemo(token, dept, officer);
+      if (result) {
+        setMemoModalData({
+          ticketToken: token,
+          memoNumber: result.memoNumber,
+          date: result.date,
+          memoContent: result.memoContent
+        });
+        showToast(`सरकारी मांग पत्र (${result.memoNumber}) तैयार हो गया!`);
+      }
+    } catch {
+      showToast("मांग पत्र तैयार करने में त्रुटि हुई।");
+    } finally {
+      setIsGeneratingMemo(false);
+    }
+  };
+
+  // 5D. RESOLVE TICKET & DISPATCH OUTBOUND WHATSAPP (whatsapp_alerts.py, whatsapp_worker.py)
+  const handleUpdateTicketStatus = async (
+    token: string, 
+    status: 'pending' | 'in-progress' | 'resolved' | 'verified',
+    note: string,
+    dept?: string
+  ) => {
+    try {
+      const updated = await updateGrievanceStatus(token, status, note);
+      if (updated) {
+        // Log locally
+        const newEntry: WarRoomAuditEntry = {
+          id: "ACT-" + Math.floor(100 + Math.random() * 900),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          ward: updated.location || "नूरपुर",
+          action: `${token} स्थिति: ${status.toUpperCase()} (${note})`,
+          officer: dept || "विधायक कैंप कार्यालय",
+          amount: "-",
+          status: status === 'resolved' ? 'कार्य संपन्न' : 'प्रक्रियाधीन'
+        };
+        setAuditLog(prev => [newEntry, ...prev]);
+
+        // Refetch WhatsApp logs to show immediate dispatch
+        const refreshedLogs = await fetchWhatsAppOutboundLogs();
+        if (refreshedLogs) setWhatsAppLogs(refreshedLogs);
+
+        showToast(`✓ टिकट ${token} अद्यतन हुआ! नागरिक को WhatsApp पर ऑटो-अलर्ट प्रेषित किया गया।`);
+      }
+    } catch {
+      showToast("स्थिति अपडेट करने में समस्या हुई।");
+    }
   };
 
   // 6. DOWNLOAD ADMIN DASHBOARD HTML
@@ -430,6 +585,81 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview
           </button>
         </div>
 
+      </div>
+
+      {/* 1B. AUTONOMOUS WAR ROOM SLA AGENT & OUTBOUND WHATSAPP STRIP (automation.py & whatsapp_worker.py) */}
+      <div className="bg-gradient-to-r from-[#0d2137] via-[#102a45] to-[#152338] border border-amber-500/40 p-4 rounded-2xl shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center shrink-0">
+            <Sparkles className="w-5 h-5 animate-pulse" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-black text-white uppercase tracking-wider">
+                स्वायत्त वार रूम ट्रायज व एस्केलेशन एजेंट (AI Autonomous SLA Triage)
+              </span>
+              <span className="bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
+                {slaStatus?.breachedCount || 2} टिकट 48h SLA उल्लंघन
+              </span>
+              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                WhatsApp वर्कर सक्रिय
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-300 mt-0.5">
+              48 घंटे से लंबित शिकायतों का स्वतः CRITICAL प्राथमिकीकरण • विभागीय मांग पत्र व नागरिक WhatsApp अधिसूचनाएं स्वतः प्रेषित
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {/* Executive Daily Briefing Trigger */}
+          <button
+            onClick={handleFetchBriefing}
+            disabled={isLoadingBriefing}
+            className="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-extrabold text-xs rounded-xl shadow-md flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+          >
+            {isLoadingBriefing ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>ब्रीफिंग लोड हो रही है...</span>
+              </>
+            ) : (
+              <>
+                <FileText className="w-3.5 h-3.5" />
+                <span>📋 8:00 AM दैनिक ब्रीफिंग (AI Briefing)</span>
+              </>
+            )}
+          </button>
+
+          {/* Outbound WhatsApp Log Trigger */}
+          <button
+            onClick={() => setIsWhatsAppDrawerOpen(true)}
+            className="px-3 py-2 bg-[#1b3a5e] hover:bg-[#234b7a] text-emerald-300 border border-emerald-500/30 font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 transition active:scale-95"
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+            <span>📲 WhatsApp अलर्ट लॉग ({whatsAppLogs.length})</span>
+          </button>
+
+          {/* Quick Memo Generator Trigger */}
+          <button
+            onClick={() => handleGenerateMemo('#NR-8945', 'जल शक्ति विभाग', 'XEN जल शक्ति')}
+            disabled={isGeneratingMemo}
+            className="px-3 py-2 bg-[#122338] hover:bg-[#1a3350] text-sky-300 border border-sky-500/30 font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+          >
+            {isGeneratingMemo ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>मांग पत्र बन रहा है...</span>
+              </>
+            ) : (
+              <>
+                <ShieldAlert className="w-3.5 h-3.5 text-sky-400" />
+                <span>सरकारी मांग पत्र बनाएं</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* 2. TOP ROW: HIGH-LEVEL METRICS / KPIS (Dark Command Theme Cards) */}
@@ -1181,35 +1411,236 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview
         </div>
       )}
 
-      {/* Padyatra Modal */}
-      {isPadyatraModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-          <div className="bg-[#0f1f33] rounded-3xl border border-[#1e3a5f] max-w-lg w-full p-6 shadow-2xl space-y-4 text-slate-100">
-            <div className="flex items-center justify-between pb-2 border-b border-[#1e3a5f]">
-              <h4 className="font-black text-white text-base">
-                घर-घर निक्का पदयात्रा • लाइव चौपाल डायरी
-              </h4>
-              <button onClick={() => setIsPadyatraModalOpen(false)} className="p-1 text-slate-400 hover:text-white">
+      {/* 5A. AUTONOMOUS 8:00 AM EXECUTIVE BRIEFING MODAL (automation.py) */}
+      {isBriefingModalOpen && briefingData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#0f1f33] rounded-3xl border border-amber-500/50 max-w-2xl w-full p-6 shadow-2xl space-y-4 text-slate-100 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-[#1e3a5f]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center font-bold">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-white text-base">
+                    दैनिक 8:00 AM कार्यकारी ब्रीफिंग (Executive Daily Briefing)
+                  </h3>
+                  <p className="text-[11px] text-amber-300">
+                    स्वायत्त वार रूम इंटेलिजेंस • {briefingData.generatedAt}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  if (briefingAudioRef.current) briefingAudioRef.current.pause();
+                  setIsPlayingBriefingVoice(false);
+                  setIsBriefingModalOpen(false);
+                }} 
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-[#102a43]"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-2 text-xs text-slate-300">
-              <div className="bg-emerald-950/40 border border-emerald-500/30 p-2.5 rounded-xl text-emerald-300 font-medium">
-                ✓ चौपाल 1: भदवार पंचायत भवन (प्रातः 11:00) — 280 नागरिक उपस्थित • 14 प्रार्थना पत्र निस्तारित
+
+            {/* Quick Stats Pill Strip */}
+            {briefingData.stats && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                <div className="bg-[#08101d] p-2 rounded-xl border border-[#1e3a5f]">
+                  <span className="text-slate-400 text-[10px]">कुल समस्याएं</span>
+                  <p className="font-extrabold text-white text-base">{briefingData.stats.total}</p>
+                </div>
+                <div className="bg-[#08101d] p-2 rounded-xl border border-[#1e3a5f]">
+                  <span className="text-emerald-400 text-[10px]">समाधान दर</span>
+                  <p className="font-extrabold text-emerald-400 text-base">{briefingData.stats.redressalRate}%</p>
+                </div>
+                <div className="bg-[#08101d] p-2 rounded-xl border border-[#1e3a5f]">
+                  <span className="text-amber-400 text-[10px]">प्रगति पर</span>
+                  <p className="font-extrabold text-amber-400 text-base">{briefingData.stats.inProgress}</p>
+                </div>
+                <div className="bg-[#08101d] p-2 rounded-xl border border-[#1e3a5f]">
+                  <span className="text-rose-400 text-[10px]">लंबित (Push Needed)</span>
+                  <p className="font-extrabold text-rose-400 text-base">{briefingData.stats.pending}</p>
+                </div>
               </div>
-              <div className="bg-amber-950/40 border border-amber-500/30 p-2.5 rounded-xl text-amber-300 font-medium">
-                ● चौपाल 2: जसूर वार्ड 14 (शाम 04:30) — वर्तमान में जारी • ट्रांसफार्मर व सड़क का स्थल निरीक्षण
-              </div>
-              <div className="bg-[#08101d] border border-[#1c3856] p-2.5 rounded-xl text-slate-400 font-medium">
-                चौपाल 3: खन्नी दुर्गा माता मंदिर प्रांगण (शाम 06:00) — प्रस्तावित
+            )}
+
+            {/* Briefing Narrative */}
+            <div className="bg-[#08101d] p-4 rounded-2xl border border-[#1e3a5f] text-xs leading-relaxed text-slate-200 whitespace-pre-wrap font-sans">
+              {briefingData.briefing}
+            </div>
+
+            {/* Actions: Voice Listen & Dismiss */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#1e3a5f]">
+              <button
+                onClick={handlePlayBriefingVoice}
+                className={`px-3 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition ${
+                  isPlayingBriefingVoice
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md'
+                }`}
+              >
+                {isPlayingBriefingVoice ? (
+                  <>
+                    <Volume2 className="w-4 h-4" />
+                    <span>ऑडियो रोकें (Stop)</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4" />
+                    <span>🎙️ वॉयस ब्रीफिंग सुनें (Sarvam Indic Speech)</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => {
+                  if (briefingAudioRef.current) briefingAudioRef.current.pause();
+                  setIsPlayingBriefingVoice(false);
+                  setIsBriefingModalOpen(false);
+                }}
+                className="bg-[#102a43] hover:bg-[#1a3a60] text-slate-300 font-bold text-xs px-4 py-2 rounded-xl"
+              >
+                बंद करें (Close)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5B. OFFICIAL GOVERNMENT REQUISITION MEMO MODAL (automation.py) */}
+      {memoModalData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+          <div className="bg-white text-slate-900 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto border border-slate-300">
+            {/* Government Official Letterhead */}
+            <div className="text-center border-b-2 border-slate-900 pb-4 space-y-1">
+              <span className="text-[11px] font-black tracking-widest text-slate-600 uppercase">
+                हिमाचल प्रदेश विधानसभा • कार्यालय विधायक
+              </span>
+              <h2 className="text-xl font-black text-[#102a43]">
+                रणबीर सिंह निक्का (विधायक - 142 नूरपुर)
+              </h2>
+              <p className="text-xs text-slate-600">
+                विधायक कैंप कार्यालय: निकट उपमंडल अधिकारी कार्यालय, नूरपुर (कांगड़ा) • हेल्पलाइन: 1800-123-456
+              </p>
+              <div className="flex justify-between text-[11px] font-mono font-bold text-slate-700 pt-2 border-t border-slate-200">
+                <span>पत्रांक: {memoModalData.memoNumber}</span>
+                <span>दिनांक: {memoModalData.date}</span>
               </div>
             </div>
-            <div className="flex justify-end pt-2">
+
+            {/* Memo Content */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 font-serif text-xs leading-relaxed text-slate-800 whitespace-pre-wrap">
+              {memoModalData.memoContent}
+            </div>
+
+            {/* Official Seal Mockup */}
+            <div className="flex justify-between items-end pt-4 border-t border-slate-200 text-xs">
+              <div className="text-[10px] text-slate-500 font-mono">
+                <span className="inline-block border border-slate-400 p-1.5 rounded-sm">
+                  [विधानसभा सचिवालय आधिकारिक बारकोड: {memoModalData.memoNumber}]
+                </span>
+              </div>
+              <div className="text-right">
+                <div className="font-extrabold text-sm text-[#102a43]">रणबीर सिंह निक्का</div>
+                <div className="text-[11px] text-slate-600">विधायक, 142 नूरपुर विधानसभा</div>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex justify-between items-center pt-3 border-t border-slate-200">
               <button
-                onClick={() => setIsPadyatraModalOpen(false)}
-                className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-xl"
+                onClick={() => {
+                  navigator.clipboard.writeText(memoModalData.memoContent);
+                  setCopiedMemo(true);
+                  setTimeout(() => setCopiedMemo(false), 2000);
+                }}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center gap-1.5 transition"
               >
-                बंद करें
+                {copiedMemo ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedMemo ? 'कॉपी हो गया' : 'कॉपी करें'}</span>
+              </button>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>प्रिंट / PDF सेव करें</span>
+                </button>
+                <button
+                  onClick={() => setMemoModalData(null)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-xl transition"
+                >
+                  बंद करें
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5C. OUTBOUND WHATSAPP QUEUE & LOGS DRAWER (whatsapp_worker.py) */}
+      {isWhatsAppDrawerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#0f1f33] rounded-3xl border border-emerald-500/40 max-w-xl w-full p-6 shadow-2xl space-y-4 text-slate-100 animate-in fade-in zoom-in-95 duration-200 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-[#1e3a5f] shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                  <MessageSquare className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-white text-base">
+                    आउटबाउंड WhatsApp संदेश कतार (Outbound Worker)
+                  </h3>
+                  <p className="text-[11px] text-emerald-300">
+                    whatsapp_worker.py • {whatsAppLogs.length} लाइव संदेश प्रेषित
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsWhatsAppDrawerOpen(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-[#102a43]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* List of Outbound Dispatches */}
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+              {whatsAppLogs.length === 0 ? (
+                <div className="text-center py-8 text-xs text-slate-400">
+                  कोई प्रेषित संदेश उपलब्ध नहीं है।
+                </div>
+              ) : (
+                whatsAppLogs.map((log) => (
+                  <div key={log.id} className="bg-[#08101d] p-3 rounded-2xl border border-[#1e3a5f] space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-bold text-amber-400">{log.ticketToken}</span>
+                        <span className="text-slate-400">• {log.citizenName} ({log.recipientPhone})</span>
+                      </div>
+                      <span className="bg-emerald-950 text-emerald-300 border border-emerald-700 text-[10px] font-bold px-2 py-0.2 rounded-full flex items-center gap-1">
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        {log.status}
+                      </span>
+                    </div>
+                    <div className="bg-[#0c1829] p-2.5 rounded-xl border border-slate-800 text-slate-200 text-xs italic">
+                      "{log.message}"
+                    </div>
+                    <div className="text-[10px] text-slate-500 text-right">
+                      प्रेषित: {log.timestamp} • टेम्प्लेट: <span className="font-mono text-slate-400">{log.templateType}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-[#1e3a5f] shrink-0">
+              <button
+                onClick={() => setIsWhatsAppDrawerOpen(false)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition"
+              >
+                पूर्ण (Done)
               </button>
             </div>
           </div>
@@ -1219,3 +1650,4 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview
     </div>
   );
 };
+

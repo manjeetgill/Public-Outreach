@@ -57,9 +57,12 @@ export const VoiceDeskModal: React.FC<VoiceDeskModalProps> = ({ isOpen, onClose,
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const [speechProvider, setSpeechProvider] = useState<'sarvam' | 'gemini'>('sarvam');
+  const [dialectMode, setDialectMode] = useState<'kangri' | 'standard_hindi'>('kangri');
+
   const playVoiceResponse = async (text: string) => {
     try {
-      const audioUrl = await synthesizeSpeech(text, 'Zephyr');
+      const audioUrl = await synthesizeSpeech(text, 'Aoede', speechProvider);
       if (currentAudioRef.current) currentAudioRef.current.pause();
       const audio = new Audio(audioUrl);
       currentAudioRef.current = audio;
@@ -117,7 +120,10 @@ export const VoiceDeskModal: React.FC<VoiceDeskModalProps> = ({ isOpen, onClose,
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         setIsProcessing(true);
         try {
-          const transcribed = await transcribeAudio(audioBlob);
+          const transcribed = await transcribeAudio(audioBlob, {
+            dialectMode,
+            speechProvider
+          });
           if (transcribed && transcribed.trim()) {
             await speakQuery(transcribed.trim());
           }
@@ -275,6 +281,26 @@ export const VoiceDeskModal: React.FC<VoiceDeskModalProps> = ({ isOpen, onClose,
               ⚡ बिजली ट्रांसफार्मर
             </button>
           </div>
+        </div>
+
+        {/* Sarvam Indic Speech Engine & Dialect Toggle (sarvam_speech.py) */}
+        <div className="bg-slate-900/80 p-2 rounded-xl border border-amber-500/30 flex items-center justify-between text-[10px] mb-2 z-10">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="text-amber-300 font-bold">
+              {dialectMode === 'kangri' ? 'कांगड़ी / पहाड़ी डायलेक्ट' : 'मानक हिंदी'}
+            </span>
+            <span className="bg-amber-500/20 text-amber-300 text-[9px] px-1.5 py-0.2 rounded font-mono">
+              Sarvam Indic
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDialectMode(prev => prev === 'kangri' ? 'standard_hindi' : 'kangri')}
+            className="text-[10px] text-slate-300 hover:text-white underline font-semibold"
+          >
+            {dialectMode === 'kangri' ? 'हिंदी में बदलें' : 'कांगड़ी मोड'}
+          </button>
         </div>
 
         {/* Call Controls */}

@@ -28,6 +28,8 @@ interface DesktopNavbarProps {
   onToggleFrameMode: () => void;
   onOpenVoiceDesk: () => void;
   onOpenComplaintModal: () => void;
+  onOpenAuthModal?: () => void;
+  currentUser?: string | null;
 }
 
 export const DesktopNavbar: React.FC<DesktopNavbarProps> = ({
@@ -38,7 +40,9 @@ export const DesktopNavbar: React.FC<DesktopNavbarProps> = ({
   isFrameMode,
   onToggleFrameMode,
   onOpenVoiceDesk,
-  onOpenComplaintModal
+  onOpenComplaintModal,
+  onOpenAuthModal,
+  currentUser
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
@@ -232,6 +236,22 @@ export const DesktopNavbar: React.FC<DesktopNavbarProps> = ({
           >
             {lang === 'hi' ? 'EN | हिंदी' : 'हिंदी | EN'}
           </button>
+
+          {/* Citizen OTP Login / User State (sms_service.py) */}
+          {onOpenAuthModal && (
+            <button
+              onClick={onOpenAuthModal}
+              className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1 transition ${
+                currentUser 
+                  ? 'bg-blue-50 text-blue-800 border-blue-200 shadow-xs' 
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+              }`}
+              title={currentUser ? `लॉगिन: ${currentUser}` : 'नागरिक सत्यापन (SMS OTP)'}
+            >
+              <span className={`w-2 h-2 rounded-full ${currentUser ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+              <span className="max-w-[80px] truncate">{currentUser ? currentUser : (lang === 'hi' ? 'नागरिक लॉगिन' : 'Citizen OTP')}</span>
+            </button>
+          )}
 
           {/* Primary Action Button: Lodge Grievance */}
           <button
