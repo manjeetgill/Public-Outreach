@@ -17,6 +17,8 @@ import { WardsScreen } from './components/screens/WardsScreen';
 import { VisionScreen } from './components/screens/VisionScreen';
 import { KaryakartaScreen } from './components/screens/KaryakartaScreen';
 import { AdminScreen } from './components/screens/AdminScreen';
+import { PannaPramukhScreen } from './components/screens/PannaPramukhScreen';
+import { PadyatraBeaconScreen } from './components/screens/PadyatraBeaconScreen';
 
 // Modals
 import { LodgeComplaintModal } from './components/modals/LodgeComplaintModal';
@@ -27,6 +29,9 @@ import { MediaPreviewModal } from './components/modals/MediaPreviewModal';
 import { JanadeshChatbotModal } from './components/modals/JanadeshChatbotModal';
 import { AiVideoStudioModal } from './components/modals/AiVideoStudioModal';
 import { AuthModal } from './components/modals/AuthModal';
+import { VoterSlipModal } from './components/modals/VoterSlipModal';
+import { YojanaEligibilityModal } from './components/modals/YojanaEligibilityModal';
+import { MlaRecommendationModal } from './components/modals/MlaRecommendationModal';
 import { Bot, Video, Sparkles } from 'lucide-react';
 
 import { INITIAL_GRIEVANCES } from './data/campaignData';
@@ -43,6 +48,10 @@ export default function App() {
   const [isVoiceDeskOpen, setIsVoiceDeskOpen] = useState(false);
   const [isWhatsAppAgentOpen, setIsWhatsAppAgentOpen] = useState(false);
   const [isVolunteerModalOpen, setIsVolunteerModalOpen] = useState(false);
+  const [isVoterSlipOpen, setIsVoterSlipOpen] = useState(false);
+  const [isYojanaModalOpen, setIsYojanaModalOpen] = useState(false);
+  const [isMlaLetterOpen, setIsMlaLetterOpen] = useState(false);
+
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [isVideoStudioOpen, setIsVideoStudioOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -141,8 +150,21 @@ export default function App() {
                   onOpenComplaintModal={() => setIsComplaintModalOpen(true)} 
                   onOpenVoiceDesk={() => setIsVoiceDeskOpen(true)} 
                   onOpenWhatsAppAgent={() => setIsWhatsAppAgentOpen(true)} 
+                  onOpenVoterSlip={() => setIsVoterSlipOpen(true)}
+                  onOpenYojanaModal={() => setIsYojanaModalOpen(true)}
+                  onOpenMlaLetter={() => setIsMlaLetterOpen(true)}
                   lang={lang} 
                 />
+              )}
+              {currentTab === 'screen-panna-pramukh' && (
+                <div className="p-3">
+                  <PannaPramukhScreen lang={lang} />
+                </div>
+              )}
+              {currentTab === 'screen-padyatra-beacon' && (
+                <div className="p-3">
+                  <PadyatraBeaconScreen lang={lang} />
+                </div>
               )}
               {currentTab === 'screen-hisaab' && (
                 <HisaabScreen lang={lang} />
@@ -213,6 +235,9 @@ export default function App() {
                         onOpenComplaintModal={() => setIsComplaintModalOpen(true)} 
                         onOpenVoiceDesk={() => setIsVoiceDeskOpen(true)} 
                         onOpenWhatsAppAgent={() => setIsWhatsAppAgentOpen(true)} 
+                        onOpenVoterSlip={() => setIsVoterSlipOpen(true)}
+                        onOpenYojanaModal={() => setIsYojanaModalOpen(true)}
+                        onOpenMlaLetter={() => setIsMlaLetterOpen(true)}
                         lang={lang} 
                       />
                     </div>
@@ -338,6 +363,18 @@ export default function App() {
                   <AdminScreen lang={lang} onBackToOverview={() => handleSelectTab('screen-home')} />
                 </div>
               )}
+
+              {currentTab === 'screen-panna-pramukh' && (
+                <div className="space-y-6">
+                  <PannaPramukhScreen lang={lang} />
+                </div>
+              )}
+
+              {currentTab === 'screen-padyatra-beacon' && (
+                <div className="space-y-6">
+                  <PadyatraBeaconScreen lang={lang} />
+                </div>
+              )}
             </main>
           </div>
 
@@ -421,6 +458,27 @@ export default function App() {
         onClose={() => setIsAuthModalOpen(false)} 
         lang={lang} 
         onLoginSuccess={(name) => setCurrentUser(name)} 
+      />
+
+      {/* Digital Voter Slip Modal */}
+      <VoterSlipModal 
+        isOpen={isVoterSlipOpen}
+        onClose={() => setIsVoterSlipOpen(false)}
+        lang={lang}
+      />
+
+      {/* Sarkari Welfare Scheme Eligibility Modal */}
+      <YojanaEligibilityModal 
+        isOpen={isYojanaModalOpen}
+        onClose={() => setIsYojanaModalOpen(false)}
+        lang={lang}
+      />
+
+      {/* Official MLA Recommendation Letter Modal */}
+      <MlaRecommendationModal 
+        isOpen={isMlaLetterOpen}
+        onClose={() => setIsMlaLetterOpen(false)}
+        lang={lang}
       />
     </div>
   );

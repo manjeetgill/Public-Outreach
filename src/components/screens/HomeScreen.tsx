@@ -19,12 +19,16 @@ import {
 } from 'lucide-react';
 import { MLA_INFO, INITIAL_PADYATRA } from '../../data/campaignData';
 import { ScreenTab, Language } from '../../types/campaign';
+import { DailyJanvaniPlayer } from '../audio/DailyJanvaniPlayer';
 
 interface HomeScreenProps {
   onSwitchTab: (tab: ScreenTab) => void;
   onOpenComplaintModal: () => void;
   onOpenVoiceDesk: () => void;
   onOpenWhatsAppAgent: () => void;
+  onOpenVoterSlip?: () => void;
+  onOpenYojanaModal?: () => void;
+  onOpenMlaLetter?: () => void;
   lang: Language;
 }
 
@@ -33,6 +37,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenComplaintModal,
   onOpenVoiceDesk,
   onOpenWhatsAppAgent,
+  onOpenVoterSlip,
+  onOpenYojanaModal,
+  onOpenMlaLetter,
   lang
 }) => {
   const shareUpdateToWhatsApp = () => {
@@ -42,8 +49,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   return (
     <section className="p-4 space-y-4">
-      
-      {/* 1. Hero MLA Card */}
+      {/* 0. Community Audio Bulletin: 60-Second Daily Voice Capsule */}
+      <DailyJanvaniPlayer lang={lang} />
+
       <div className="bg-gradient-to-br from-[#102a43] via-[#0f243a] to-[#0a1827] text-white rounded-2xl p-4 shadow-lg border border-slate-800 relative overflow-hidden">
         <div className="absolute -right-8 -top-8 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"></div>
         
@@ -218,6 +226,157 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               {lang === 'hi' ? 'मैसेज भेजें (Send SMS: NIKKA HELP)' : 'Send SMS (Offline)'}
             </a>
           </div>
+        </div>
+      </div>
+
+      {/* 2b. Rural India Political & Civic Outreach Hub (All 6 Rural Capabilities) */}
+      <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100/60 rounded-2xl p-4 border border-amber-300/80 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 bg-amber-500 text-slate-950 rounded-lg font-black text-xs">
+              ★
+            </span>
+            <div>
+              <h3 className="text-xs font-black text-slate-950 uppercase tracking-wider">
+                {lang === 'hi' ? 'ग्रामीण जनसेवा एवं बूथ प्रबंधन केंद्र' : 'Rural Civic & Booth Outreach Hub'}
+              </h3>
+              <p className="text-[10px] text-amber-900 font-medium">
+                विधानसभा 142 नूरपुर • ऑफलाइन बूथ साथी • मतदाता पर्ची • संस्तुति पत्र
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] font-black bg-amber-200/90 text-amber-950 px-2 py-0.5 rounded-full border border-amber-400">
+            ग्रामीण 6 विशेष सुविधाएं
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          {/* Capability 1: Panna Pramukh Companion */}
+          <button
+            onClick={() => onSwitchTab('screen-panna-pramukh')}
+            className="p-3 bg-white hover:bg-amber-100/50 rounded-xl border border-amber-200 text-left transition shadow-2xs group cursor-pointer"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="w-7 h-7 rounded-lg bg-slate-900 text-amber-400 flex items-center justify-center text-xs font-black">
+                📴
+              </span>
+              <span className="text-[9px] bg-slate-100 text-slate-700 font-bold px-1.5 py-0.5 rounded">
+                100% ऑफलाइन
+              </span>
+            </div>
+            <div className="text-xs font-black text-slate-900 group-hover:text-amber-800">
+              {lang === 'hi' ? 'पन्ना प्रमुख साथी' : 'Booth Companion'}
+            </div>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              मतदान दर्ज व डोरस्टेप सर्वे
+            </p>
+          </button>
+
+          {/* Capability 2: Digital Voter Slip */}
+          <button
+            onClick={onOpenVoterSlip}
+            className="p-3 bg-white hover:bg-amber-100/50 rounded-xl border border-amber-200 text-left transition shadow-2xs group cursor-pointer"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="w-7 h-7 rounded-lg bg-sky-600 text-white flex items-center justify-center text-xs font-black">
+                🪪
+              </span>
+              <span className="text-[9px] bg-sky-100 text-sky-800 font-bold px-1.5 py-0.5 rounded">
+                व्हाट्सएप शेयर
+              </span>
+            </div>
+            <div className="text-xs font-black text-slate-900 group-hover:text-sky-800">
+              {lang === 'hi' ? 'डिजिटल मतदाता पर्ची' : 'Digital Voter Slip'}
+            </div>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              क्रम सं. व बूथ मैप्स लिंक
+            </p>
+          </button>
+
+          {/* Capability 3: Yojana Eligibility Engine */}
+          <button
+            onClick={onOpenYojanaModal}
+            className="p-3 bg-white hover:bg-amber-100/50 rounded-xl border border-amber-200 text-left transition shadow-2xs group cursor-pointer"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-xs font-black">
+                🌾
+              </span>
+              <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
+                60-सेकंड
+              </span>
+            </div>
+            <div className="text-xs font-black text-slate-900 group-hover:text-emerald-800">
+              {lang === 'hi' ? 'सरकारी योजना चेकर' : 'Sarkari Yojana'}
+            </div>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              8+ हिमाचल योजनाएं व लाभ
+            </p>
+          </button>
+
+          {/* Capability 4: One-Click MLA Letter */}
+          <button
+            onClick={onOpenMlaLetter}
+            className="p-3 bg-white hover:bg-amber-100/50 rounded-xl border border-amber-200 text-left transition shadow-2xs group cursor-pointer"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="w-7 h-7 rounded-lg bg-amber-600 text-white flex items-center justify-center text-xs font-black">
+                🏛️
+              </span>
+              <span className="text-[9px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">
+                आधिकारिक
+              </span>
+            </div>
+            <div className="text-xs font-black text-slate-900 group-hover:text-amber-800">
+              {lang === 'hi' ? 'विधायक संस्तुति पत्र' : 'MLA Letterhead'}
+            </div>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              प्राथमिकता डिस्पैच आदेश
+            </p>
+          </button>
+
+          {/* Capability 5: Live Padyatra Beacon */}
+          <button
+            onClick={() => onSwitchTab('screen-padyatra-beacon')}
+            className="p-3 bg-white hover:bg-amber-100/50 rounded-xl border border-amber-200 text-left transition shadow-2xs group cursor-pointer"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center text-xs font-black">
+                📍
+              </span>
+              <span className="text-[9px] bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-rose-600 rounded-full animate-ping"></span>
+                लाइव जीपीएस
+              </span>
+            </div>
+            <div className="text-xs font-black text-slate-900 group-hover:text-rose-800">
+              {lang === 'hi' ? 'पदयात्रा लाइव बीकन' : 'Convoy GPS Radar'}
+            </div>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              गांव-दर-गांव 2km अलर्ट
+            </p>
+          </button>
+
+          {/* Quick Grievance Direct */}
+          <button
+            onClick={onOpenComplaintModal}
+            className="p-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-left transition shadow-xs group cursor-pointer"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="w-7 h-7 rounded-lg bg-white/20 text-white flex items-center justify-center text-xs font-black">
+                ⚡
+              </span>
+              <span className="text-[9px] bg-white/20 text-white font-bold px-1.5 py-0.5 rounded">
+                24x7
+              </span>
+            </div>
+            <div className="text-xs font-black text-white">
+              {lang === 'hi' ? 'जनसमस्या निवारण' : 'Lodge Grievance'}
+            </div>
+            <p className="text-[10px] text-red-100 mt-0.5">
+              कैंप ऑफिस को सीधी शिकायत
+            </p>
+          </button>
         </div>
       </div>
 

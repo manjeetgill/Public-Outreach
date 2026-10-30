@@ -175,6 +175,29 @@ export const DesktopNavbar: React.FC<DesktopNavbarProps> = ({
             <span>{lang === 'hi' ? 'कार्यकर्ता हब' : 'Volunteers'}</span>
           </button>
 
+          <button
+            onClick={() => onSelectTab('screen-panna-pramukh')}
+            className={`px-3 py-2 rounded-lg transition flex items-center gap-1.5 font-bold ${
+              currentTab === 'screen-panna-pramukh' 
+                ? 'bg-amber-500 text-slate-950 shadow-xs' 
+                : 'hover:bg-amber-50 text-amber-900 border border-amber-300/60'
+            }`}
+          >
+            <span>📴 {lang === 'hi' ? 'पन्ना प्रमुख' : 'Booth'}</span>
+          </button>
+
+          <button
+            onClick={() => onSelectTab('screen-padyatra-beacon')}
+            className={`px-3 py-2 rounded-lg transition flex items-center gap-1.5 font-bold ${
+              currentTab === 'screen-padyatra-beacon' 
+                ? 'bg-rose-600 text-white shadow-xs' 
+                : 'hover:bg-rose-50 text-rose-800 border border-rose-200'
+            }`}
+          >
+            <span>📍 {lang === 'hi' ? 'पदयात्रा बीकन' : 'Convoy GPS'}</span>
+          </button>
+
+
           {/* Admin War Room Decision Desk */}
           <button
             onClick={() => onSelectTab('screen-admin')}

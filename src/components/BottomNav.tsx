@@ -80,7 +80,20 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           }`}
         >
           <Users className={`w-5 h-5 ${currentTab === 'screen-karyakarta' ? 'text-amber-600' : 'text-slate-500'}`} />
-          <span>{lang === 'hi' ? 'Karyakarta' : 'Volunteers'}</span>
+          <span>{lang === 'hi' ? 'कार्यकर्ता' : 'Volunteers'}</span>
+        </button>
+
+        {/* Booth Companion (Offline Panna Pramukh) */}
+        <button 
+          onClick={() => onSelectTab('screen-panna-pramukh')}
+          className={`flex flex-col items-center gap-1 text-[11px] transition ${
+            currentTab === 'screen-panna-pramukh' 
+              ? 'text-amber-600 font-extrabold' 
+              : 'text-slate-500 hover:text-slate-800 font-medium'
+          }`}
+        >
+          <span className="text-base leading-none">📴</span>
+          <span>{lang === 'hi' ? 'बूथ साथी' : 'Booth'}</span>
         </button>
       </nav>
     </>
