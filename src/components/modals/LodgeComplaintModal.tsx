@@ -17,6 +17,7 @@ export const LodgeComplaintModal: React.FC<LodgeComplaintModalProps> = ({
   onAddComplaint,
   lang
 }) => {
+  const [inputMode, setInputMode] = useState<'VOICE' | 'FORM'>('VOICE');
   const [category, setCategory] = useState('सड़क एवं गड्ढा मरम्मत');
   const [wardNo, setWardNo] = useState(14);
   const [locationName, setLocationName] = useState('');
@@ -33,6 +34,42 @@ export const LodgeComplaintModal: React.FC<LodgeComplaintModalProps> = ({
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  const parseVoiceInput = (text: string) => {
+    // 1. Detect Ward Number
+    const wardMatch = text.match(/(?:वार्ड|ward)\s*(\d+)/i);
+    if (wardMatch) {
+      const num = parseInt(wardMatch[1], 10);
+      if (!isNaN(num) && num >= 1 && num <= 24) setWardNo(num);
+    }
+
+    // 2. Detect Category
+    if (text.includes('ट्रांसफार्मर') || text.includes('बिजली') || text.includes('करंट') || text.includes('लाइट')) {
+      setCategory('विद्युत / ट्रांसफार्मर समस्या');
+    } else if (text.includes('पानी') || text.includes('पाइप') || text.includes('लीक') || text.includes('जल') || text.includes('नल')) {
+      setCategory('पेयजल / पाइपलाइन लीकेज');
+    } else if (text.includes('सड़क') || text.includes('गड्ढा') || text.includes('रास्ता') || text.includes('तारकोल') || text.includes('भूस्खलन')) {
+      setCategory('सड़क एवं गड्ढा मरम्मत');
+    } else if (text.includes('राशन') || text.includes('पेंशन') || text.includes('योजना') || text.includes('बीपीएल')) {
+      setCategory('राशन एवं सरकारी योजना सहायता');
+    } else if (text.includes('नाली') || text.includes('सफाई') || text.includes('कचरा') || text.includes('कूड़ा')) {
+      setCategory('नाली एवं स्वच्छता सफाई');
+    }
+
+    // 3. Detect Village / Ward Locality
+    const localities = ['सुलियाली', 'कोटला', 'जसूर', 'भदवार', 'खन्नी', 'रे', 'फतेहपुर', 'बासा', 'सधूं', 'त्रिलोकपुर', 'राजा का तालाब'];
+    for (const loc of localities) {
+      if (text.includes(loc)) {
+        setLocationName(loc);
+        break;
+      }
+    }
+  };
+
+  const handleSelectVoiceSample = (sampleText: string) => {
+    setDescription(sampleText);
+    parseVoiceInput(sampleText);
+  };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -82,6 +119,7 @@ export const LodgeComplaintModal: React.FC<LodgeComplaintModalProps> = ({
           const text = await transcribeAudio(audioBlob);
           if (text) {
             setDescription(prev => prev ? `${prev} ${text}` : text);
+            parseVoiceInput(text);
           }
         } catch (err) {
           console.error('Transcription error:', err);
@@ -102,6 +140,65 @@ export const LodgeComplaintModal: React.FC<LodgeComplaintModalProps> = ({
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
     }
+  };
+
+  const handleSubmitDirect = () => {
+    const finalLocation = locationName.trim() || `वार्ड ${wardNo} नूरपुर`;
+    const finalCitizen = citizenName.trim() || 'नूरपुर नागरिक (वॉयस)';
+    const finalDesc = description.trim() || `${category} - वार्ड ${wardNo} समस्या`;
+
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    const token = `#NR-${randomNum}`;
+
+    const newTicket: GrievanceTicket = {
+      token,
+      category,
+      title: `${category} - ${finalLocation}`,
+      titleEn: `${category} issue at ${finalLocation}`,
+      location: `स्थान: ${finalLocation}, वार्ड ${wardNo}`,
+      wardNo,
+      citizenName: finalCitizen,
+      phone: phone || '98160*****',
+      status: 'in-progress',
+      submittedDate: 'अभी-अभी (Just now)',
+      whatsappSubscribed: true,
+      photoUrl: photoSelected || undefined,
+      timeline: [
+        {
+          title: lang === 'hi' ? 'शिकायत दर्ज (नागरिक द्वारा • वॉयस फास्ट-ट्रैक)' : 'Grievance Registered by Citizen (Voice Fast-Track)',
+          titleEn: 'Grievance Registered by Citizen (Voice Fast-Track)',
+          timestamp: 'आज, अभी',
+          description: lang === 'hi' ? `सरल मोड द्वारा 1-टच त्वरित पंजीकरण • वार्ड ${wardNo} • प्राथमिकता: उच्च` : `Fast-track voice registration • Ward ${wardNo}`,
+          descriptionEn: 'Fast-track voice registration',
+          status: 'done'
+        },
+        {
+          title: lang === 'hi' ? 'विधायक कैंप कार्यालय को प्रेषित' : 'Dispatched to MLA Camp Office',
+          titleEn: 'Dispatched to MLA Camp Office',
+          timestamp: 'प्रक्रियाधीन',
+          description: lang === 'hi' ? 'फास्ट-ट्रैक समीक्षा टीम को ऑटो-असाइन' : 'Auto-assigned to Fast-Track Review Team',
+          descriptionEn: 'Auto-assigned to Fast-Track Review Team',
+          status: 'current'
+        },
+        {
+          title: lang === 'hi' ? 'विभागीय आदेश व फील्ड निस्तारण' : 'Departmental Action & Field Resolution',
+          titleEn: 'Departmental Action & Field Resolution',
+          timestamp: 'लंबित',
+          description: lang === 'hi' ? 'संबंधित जूनियर इंजीनियर/अधिकारी को त्वरित निर्देश' : 'Instructions sent to JE/Department',
+          descriptionEn: 'Instructions sent to JE/Department',
+          status: 'pending'
+        }
+      ]
+    };
+
+    confetti({
+      particleCount: 80,
+      spread: 70,
+      origin: { y: 0.6 }
+    });
+
+    onAddComplaint(newTicket);
+    setSubmittedToken(token);
   };
 
   if (!isOpen) return null;
@@ -248,29 +345,191 @@ export const LodgeComplaintModal: React.FC<LodgeComplaintModalProps> = ({
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-3">
-            {/* Category */}
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                {lang === 'hi' ? 'समस्या का प्रकार (Category)' : 'Grievance Type'}
-              </label>
-              <select 
-                value={category} 
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+          <div className="space-y-4">
+            {/* Mode Switcher Tabs */}
+            <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setInputMode('VOICE')}
+                className={`py-2 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 ${
+                  inputMode === 'VOICE'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
               >
-                <option value="सड़क एवं गड्ढा मरम्मत">{lang === 'hi' ? 'सड़क एवं गड्ढा मरम्मत (Road & Potholes)' : 'Roads & Potholes'}</option>
-                <option value="पेयजल / पाइपलाइन लीकेज">{lang === 'hi' ? 'पेयजल / पाइपलाइन लीकेज (Water & Leakage)' : 'Drinking Water & Leaks'}</option>
-                <option value="विद्युत / ट्रांसफार्मर समस्या">{lang === 'hi' ? 'विद्युत / ट्रांसफार्मर समस्या (Power & Transformer)' : 'Electricity & Transformer'}</option>
-                <option value="राशन एवं सरकारी योजना सहायता">{lang === 'hi' ? 'राशन एवं सरकारी योजना सहायता (Ration & Welfare Schemes)' : 'Ration & Govt Schemes'}</option>
-                <option value="नाली एवं स्वच्छता सफाई">{lang === 'hi' ? 'नाली एवं स्वच्छता सफाई (Drainage & Sanitation)' : 'Drainage & Sanitation'}</option>
-                <option value="अन्य नागरिक समस्या">{lang === 'hi' ? 'अन्य नागरिक समस्या (Other Civic Issue)' : 'Other Civic Issue'}</option>
-              </select>
+                <Mic className="w-3.5 h-3.5" />
+                <span>🎙️ बोलकर बताएं (सरल मोड)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setInputMode('FORM')}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                  inputMode === 'FORM'
+                    ? 'bg-[#102a43] text-white shadow-md'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>📝 विस्तृत फॉर्म भरें</span>
+              </button>
             </div>
 
-            {/* Ward & Location */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
+            {/* VOICE FIRST MODE */}
+            {inputMode === 'VOICE' ? (
+              <div className="space-y-4 py-2">
+                {/* Giant Pulsing Microphone Hero */}
+                <div className="bg-gradient-to-b from-emerald-50 via-teal-50/40 to-white border-2 border-emerald-300 rounded-2xl p-5 text-center shadow-inner relative overflow-hidden">
+                  <div className="mb-3">
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full border border-emerald-300">
+                      जीरो-टाइपिंग • पहाड़ी व हिंदी वॉयस AI
+                    </span>
+                  </div>
+
+                  {/* Pulsing Mic Button */}
+                  <div className="relative inline-block my-2">
+                    {isRecording && (
+                      <div className="absolute inset-0 rounded-full bg-rose-500 animate-ping opacity-60"></div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={isRecording ? stopRecording : startRecording}
+                      disabled={isTranscribing}
+                      className={`relative w-24 h-24 rounded-full flex flex-col items-center justify-center text-white shadow-2xl transition-all transform active:scale-95 ${
+                        isRecording
+                          ? 'bg-rose-600 ring-4 ring-rose-300 scale-105 animate-pulse'
+                          : isTranscribing
+                            ? 'bg-amber-500 ring-4 ring-amber-200'
+                            : 'bg-emerald-600 hover:bg-emerald-700 ring-4 ring-emerald-200 shadow-emerald-600/30'
+                      }`}
+                    >
+                      {isTranscribing ? (
+                        <>
+                          <Loader2 className="w-8 h-8 animate-spin" />
+                          <span className="text-[10px] font-bold mt-1">पहचान रहे हैं...</span>
+                        </>
+                      ) : isRecording ? (
+                        <>
+                          <MicOff className="w-8 h-8" />
+                          <span className="text-[10px] font-black mt-1">रोकें (Stop)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="w-9 h-9" />
+                          <span className="text-[10px] font-black mt-1">दबाएं व बोलें</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <p className="text-xs font-extrabold text-slate-800 mt-2">
+                    {isRecording 
+                      ? '🔴 आपकी आवाज रिकॉर्ड हो रही है... बोलें' 
+                      : isTranscribing 
+                        ? '⚡ AI आपकी समस्या व वार्ड समझ रहा है...' 
+                        : 'माइक दबाएं और अपनी समस्या बोलें (पहाड़ी या हिंदी में)'}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    उदा: "निक्का जी, सुलियाली वार्ड 3 में बिजली ट्रांसफार्मर खराब है।"
+                  </p>
+                </div>
+
+                {/* Quick 1-Tap Example Audio Prompts for instant testing */}
+                <div className="space-y-1.5">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-amber-500" />
+                    <span>या त्वरित 1-टच वॉयस उदाहरण चुनें:</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectVoiceSample('सुलियाली वार्ड 3 में 100kVA ट्रांसफार्मर 18 घंटे से जल गया है')}
+                      className="text-left p-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 text-[11px] transition text-slate-700 font-medium"
+                    >
+                      ⚡ सुलियाली वार्ड 3 ट्रांसफार्मर
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectVoiceSample('जसूर वार्ड 14 में मुख्य पेयजल पाइपलाइन टूट गई है, पानी बह रहा है')}
+                      className="text-left p-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-sky-50 hover:border-sky-300 text-[11px] transition text-slate-700 font-medium"
+                    >
+                      💧 जसूर वार्ड 14 पेयजल लीकेज
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectVoiceSample('भदवार वार्ड 19 में संपर्क मार्ग पर भारी भूस्खलन व दंगा टूट गया है')}
+                      className="text-left p-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-[11px] transition text-slate-700 font-medium"
+                    >
+                      🚜 भदवार वार्ड 19 सड़क भूस्खलन
+                    </button>
+                  </div>
+                </div>
+
+                {/* Spoken Text & Recognized Entity Badge Display */}
+                {description && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2.5 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-slate-700 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>AI द्वारा पहचानी गई समस्या:</span>
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-mono">ऑटो-पार्सड</span>
+                    </div>
+
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 italic">
+                      "{description}"
+                    </div>
+
+                    {/* Detected Attributes */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
+                      <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg font-bold">
+                        श्रेणी: {category}
+                      </span>
+                      <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-lg font-bold">
+                        वार्ड संख्या: {wardNo}
+                      </span>
+                      {locationName && (
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold">
+                          स्थान: {locationName}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Direct 1-Tap Submission Button */}
+                <button
+                  type="button"
+                  onClick={handleSubmitDirect}
+                  className="w-full py-3.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-700 text-white font-black rounded-2xl text-sm flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/20 active:scale-98 transition"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>🚀 सीधे कैंप कार्यालय में दर्ज करें (1-Tap Direct Register)</span>
+                </button>
+              </div>
+            ) : (
+              /* DETAILED FORM MODE */
+              <form onSubmit={handleSubmit} className="space-y-3">
+                {/* Category */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    {lang === 'hi' ? 'समस्या का प्रकार (Category)' : 'Grievance Type'}
+                  </label>
+                  <select 
+                    value={category} 
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="सड़क एवं गड्ढा मरम्मत">{lang === 'hi' ? 'सड़क एवं गड्ढा मरम्मत (Road & Potholes)' : 'Roads & Potholes'}</option>
+                    <option value="पेयजल / पाइपलाइन लीकेज">{lang === 'hi' ? 'पेयजल / पाइपलाइन लीकेज (Water & Leakage)' : 'Drinking Water & Leaks'}</option>
+                    <option value="विद्युत / ट्रांसफार्मर समस्या">{lang === 'hi' ? 'विद्युत / ट्रांसफार्मर समस्या (Power & Transformer)' : 'Electricity & Transformer'}</option>
+                    <option value="राशन एवं सरकारी योजना सहायता">{lang === 'hi' ? 'राशन एवं सरकारी योजना सहायता (Ration & Welfare Schemes)' : 'Ration & Govt Schemes'}</option>
+                    <option value="नाली एवं स्वच्छता सफाई">{lang === 'hi' ? 'नाली एवं स्वच्छता सफाई (Drainage & Sanitation)' : 'Drainage & Sanitation'}</option>
+                    <option value="अन्य नागरिक समस्या">{lang === 'hi' ? 'अन्य नागरिक समस्या (Other Civic Issue)' : 'Other Civic Issue'}</option>
+                  </select>
+                </div>
+
+                {/* Ward & Location */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
                   {lang === 'hi' ? 'वार्ड संख्या' : 'Ward No.'}
                 </label>
@@ -519,6 +778,8 @@ export const LodgeComplaintModal: React.FC<LodgeComplaintModalProps> = ({
             </button>
           </form>
         )}
+      </div>
+    )}
 
       </div>
     </div>

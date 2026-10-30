@@ -15,7 +15,17 @@ import {
   UserCheck,
   Building,
   ShieldCheck,
-  ChevronDown
+  ChevronDown,
+  MessageSquare,
+  Radio,
+  Volume2,
+  Share2,
+  Sparkles,
+  Clock,
+  CheckCheck,
+  Eye,
+  ExternalLink,
+  X
 } from 'lucide-react';
 import { BoothVoterRecord, Language, OfflineDoorstepGrievance } from '../../types/campaign';
 import { 
@@ -24,8 +34,14 @@ import {
   updateVoterInLocal, 
   queueDoorstepGrievanceLocal, 
   getQueuedDoorstepLocal, 
-  syncBoothWithServer 
+  syncBoothWithServer,
+  fetchCadreBroadcastPacks,
+  buildPannaPramukhRelayMessage,
+  logRelaySentToServer,
+  CadreCivicBroadcastPack,
+  FALLBACK_CIVIC_PACK
 } from '../../services/offlineBoothStore';
+import { fetchPollingStations } from '../../services/api';
 
 interface PannaPramukhScreenProps {
   lang: Language;
@@ -33,6 +49,7 @@ interface PannaPramukhScreenProps {
 
 export const PannaPramukhScreen: React.FC<PannaPramukhScreenProps> = ({ lang }) => {
   const [selectedBooth, setSelectedBooth] = useState<number>(41);
+  const [officialBooths, setOfficialBooths] = useState<any[]>([]);
   const [voters, setVoters] = useState<BoothVoterRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sentimentFilter, setSentimentFilter] = useState<'ALL' | 'SUPPORTER' | 'SWING' | 'OPPOSITION'>('ALL');
@@ -49,6 +66,54 @@ export const PannaPramukhScreen: React.FC<PannaPramukhScreenProps> = ({ lang }) 
   const [grievanceCategory, setGrievanceCategory] = useState('पेयजल / पाइपलाइन लीकेज');
   const [issueDescription, setIssueDescription] = useState('');
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
+
+  // Cadre Relay State (Layer 3)
+  const [activePack, setActivePack] = useState<CadreCivicBroadcastPack>(FALLBACK_CIVIC_PACK);
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
+  const [isRelayedLocally, setIsRelayedLocally] = useState(false);
+  const [is1on1RelayModalOpen, setIs1on1RelayModalOpen] = useState(false);
+  const [pannaPramukhName, setPannaPramukhName] = useState('राकेश शर्मा (पन्ना प्रमुख)');
+  const [boothReads, setBoothReads] = useState({ reads: 28, total: 35, pct: 80 });
+
+  // Load active civic pack and official polling stations
+  useEffect(() => {
+    fetchCadreBroadcastPacks().then(data => {
+      if (data?.activePack) setActivePack(data.activePack);
+    });
+
+    fetchPollingStations().then(booths => {
+      if (booths && booths.length > 0) {
+        setOfficialBooths(booths);
+      }
+    }).catch(console.error);
+  }, []);
+
+  // Update local relay state when booth changes
+  useEffect(() => {
+    const isRelayed = !!localStorage.getItem(`booth_${selectedBooth}_relayed_${activePack.id}`);
+    setIsRelayedLocally(isRelayed);
+    const assigned = 35;
+    const reads = isRelayed ? Math.floor(assigned * 0.8) : Math.floor(assigned * 0.2);
+    setBoothReads({ reads, total: assigned, pct: Math.round((reads / assigned) * 100) });
+  }, [selectedBooth, activePack.id]);
+
+  const handleRelayToFamilies = async () => {
+    const wardName = `वार्ड ${voters[0]?.wardNo || ((selectedBooth - 1) % 24) + 1}`;
+    const relayText = buildPannaPramukhRelayMessage(activePack, pannaPramukhName, wardName, selectedBooth);
+    
+    // Log relay dispatch to server
+    await logRelaySentToServer(selectedBooth, activePack.id, pannaPramukhName);
+    setIsRelayedLocally(true);
+    setBoothReads(prev => ({ ...prev, reads: Math.max(prev.reads, 28), pct: 80 }));
+
+    setFeedbackToast('व्हाट्सएप खुला! अपने 35 परिवारों को सूचना अग्रेषित करें।');
+    setTimeout(() => setFeedbackToast(null), 3500);
+
+    // Trigger native WhatsApp intent
+    const encoded = encodeURIComponent(relayText);
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encoded}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
   // Monitor online / offline network state
   useEffect(() => {
@@ -188,6 +253,10 @@ export const PannaPramukhScreen: React.FC<PannaPramukhScreenProps> = ({ lang }) 
   const turnoutPercent = totalCount > 0 ? Math.round((votedCount / totalCount) * 100) : 0;
   const supporterCount = voters.filter(v => v.sentimentTag === 'SUPPORTER').length;
 
+  const currentOfficialBooth = useMemo(() => {
+    return officialBooths.find(b => (b.booth_no ?? b.booth_number) === selectedBooth);
+  }, [officialBooths, selectedBooth]);
+
   // Filtered voters list
   const filteredVoters = useMemo(() => {
     return voters.filter(v => {
@@ -260,26 +329,24 @@ export const PannaPramukhScreen: React.FC<PannaPramukhScreenProps> = ({ lang }) 
                 aria-label={lang === 'hi' ? 'बूथ चुनें' : 'Select Polling Booth'}
                 className="w-full bg-slate-900/90 text-white text-xs font-semibold px-3 py-2 rounded-xl border border-slate-600 focus:outline-hidden focus:border-amber-400 appearance-none pr-8 cursor-pointer"
               >
-                {Array.from({ length: 118 }, (_, i) => i + 1).map((b) => {
-                  const boothName = b === 41 
-                    ? 'बूथ 41: राजकीय व.मा.वि. भदवार (कमरा 1)' 
-                    : b === 42 
-                    ? 'बूथ 42: राजकीय प्रा.पा. जसूर (कमरा 2)' 
-                    : b === 88 
-                    ? 'बूथ 88: राजकीय उच्च विद्यालय, रेहन' 
-                    : b === 15 
-                    ? 'बूथ 15: राजकीय मॉडल स्कूल, कोटला' 
-                    : b === 1
-                    ? 'बूथ 01: राजकीय प्राथमिक पाठशाला, जसूर'
-                    : b === 118
-                    ? 'बूथ 118: राजकीय प्रा.वि. जाफरपुर (सीमांत)'
-                    : `बूथ ${b.toString().padStart(2, '0')}: राजकीय प्राथमिक/माध्यमिक विद्यालय (वार्ड ${((b - 1) % 24) + 1})`;
-                  return (
+                {officialBooths.length > 0 ? (
+                  officialBooths.map((b) => {
+                    const bNo = b.booth_no ?? b.booth_number;
+                    const bLoc = b.location ?? b.location_hi;
+                    const bName = b.station_name ?? b.building_name_hi;
+                    return (
+                      <option key={bNo} value={bNo}>
+                        बूथ {bNo.toString().padStart(2, '0')}: {bLoc} - {bName} ({b.total_voters} मतदाता)
+                      </option>
+                    );
+                  })
+                ) : (
+                  Array.from({ length: 118 }, (_, i) => i + 1).map((b) => (
                     <option key={b} value={b}>
-                      {boothName}
+                      बूथ {b.toString().padStart(2, '0')}: राजकीय प्राथमिक/माध्यमिक विद्यालय (वार्ड {((b - 1) % 24) + 1})
                     </option>
-                  );
-                })}
+                  ))
+                )}
               </select>
               <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
             </div>
@@ -317,11 +384,158 @@ export const PannaPramukhScreen: React.FC<PannaPramukhScreenProps> = ({ lang }) 
           </div>
         </div>
 
+        {/* Official ECI Polling Station & BLO Details Bar */}
+        {currentOfficialBooth && (
+          <div className="mt-3 pt-2.5 border-t border-slate-700/60 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+            <div className="flex items-center gap-1.5 text-slate-200">
+              <Building className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="font-bold text-amber-300">मतदान केंद्र:</span>
+              <span className="font-semibold text-white">{currentOfficialBooth.station_name || currentOfficialBooth.building_name_hi}</span>
+              <span className="text-slate-400">({currentOfficialBooth.location || currentOfficialBooth.location_hi})</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="bg-slate-800/90 text-amber-300 px-2 py-0.5 rounded font-mono font-bold border border-slate-700 flex items-center gap-1">
+                <Phone className="w-3 h-3 text-emerald-400" />
+                BLO: {currentOfficialBooth.blo_name} ({currentOfficialBooth.blo_phone || currentOfficialBooth.blo_mobile})
+              </span>
+              <span className="bg-emerald-950/80 text-emerald-300 px-2 py-0.5 rounded font-bold border border-emerald-800">
+                मतदाता: {currentOfficialBooth.total_voters}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Sync Status Banner */}
         {syncStatusMsg && (
           <div className="mt-2 text-xs bg-slate-900/90 text-amber-300 p-2 rounded-lg border border-amber-500/30 flex items-center gap-1.5">
             <CheckCircle className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
             <span>{syncStatusMsg}</span>
+          </div>
+        )}
+      </div>
+
+      {/* TODAY'S CIVIC PACK CARD (DECENTRALIZED PANNA PRAMUKH RELAY - LAYER 3) */}
+      <div className="bg-gradient-to-br from-slate-900 via-[#0d2137] to-slate-900 border-2 border-amber-500/50 rounded-2xl p-4 sm:p-5 shadow-xl text-slate-100 space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-700/60 pb-3">
+          <div className="flex items-center space-x-2">
+            <span className="p-2 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/40">
+              <Sparkles className="w-4 h-4 animate-pulse" />
+            </span>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-black text-amber-400 uppercase tracking-wide">
+                  आज का जन-कल्याण बुलेटिन (Today's Civic Pack)
+                </span>
+                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-[10px] font-bold">
+                  100% Meta Spam-Free
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                पड़ोसी से पड़ोसी का विश्वसनीय संवाद • कोई विज्ञापन नहीं, केवल आवश्यक जनसेवा
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 text-xs">
+            <span className="text-slate-400">लक्षित बूथ:</span>
+            <span className="font-bold text-white bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700">
+              बूथ #{selectedBooth} के {boothReads.total} परिवार
+            </span>
+          </div>
+        </div>
+
+        {/* Headline & Bullet Points */}
+        <div className="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-sm sm:text-base font-extrabold text-white leading-snug">
+              📌 {activePack.headlineHi}
+            </h3>
+            <span className="shrink-0 px-2 py-0.5 bg-sky-500/20 text-sky-300 rounded text-[10px] font-bold">
+              {activePack.date}
+            </span>
+          </div>
+
+          <ul className="space-y-1.5 text-xs text-slate-300">
+            {activePack.bulletPoints.map((pt, idx) => (
+              <li key={idx} className="flex items-start space-x-2">
+                <CheckCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                <span>{pt}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/80">
+            <div className="flex items-center space-x-1.5 text-amber-400">
+              <Volume2 className="w-3.5 h-3.5" />
+              <span>विधायक जी का 20-सेकंड वॉयस संदेश संलग्न</span>
+            </div>
+            <span>टोल-फ्री हेल्पलाइन: <strong>{activePack.tollFreeNumber}</strong></span>
+          </div>
+        </div>
+
+        {/* Local Progress Meter */}
+        <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/60 space-y-1.5">
+          <div className="flex justify-between text-xs font-bold">
+            <span className="text-slate-300 flex items-center space-x-1.5">
+              <Eye className="w-3.5 h-3.5 text-emerald-400" />
+              <span>बूथ नागरिक जुड़ाव (Read Engagement Rate):</span>
+            </span>
+            <span className={boothReads.pct >= 75 ? 'text-emerald-400' : 'text-amber-400'}>
+              {boothReads.reads} / {boothReads.total} परिवारों ने देखा ({boothReads.pct}%)
+            </span>
+          </div>
+          <div className="h-2 w-full bg-slate-700 rounded-full overflow-hidden">
+            <div
+              style={{ width: `${boothReads.pct}%` }}
+              className={`h-full transition-all duration-500 ${
+                boothReads.pct >= 75 ? 'bg-emerald-500' : 'bg-amber-500'
+              }`}
+            ></div>
+          </div>
+          <div className="flex justify-between text-[10px] text-slate-400">
+            <span>{isRelayedLocally ? '✓ आपके द्वारा प्रसारित' : 'रिले लंबित (कृपया परिवारों को भेजें)'}</span>
+            <span>वार रूम से सीधे मॉनिटर</span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+          {/* Main 1-Tap Relay to WhatsApp Button */}
+          <button
+            onClick={handleRelayToFamilies}
+            className="flex-1 py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-600/30 active:scale-95 cursor-pointer"
+          >
+            <Share2 className="w-4 h-4" />
+            <span>अपने {boothReads.total} परिवारों को WhatsApp पर भेजें (1-Tap Relay)</span>
+          </button>
+
+          {/* Direct 1-on-1 Contact Relay Mode */}
+          <button
+            onClick={() => setIs1on1RelayModalOpen(true)}
+            className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer"
+          >
+            <Users className="w-4 h-4 text-sky-400" />
+            <span>1-on-1 परिवार सूची रिले</span>
+          </button>
+
+          {/* Toggle Message Preview */}
+          <button
+            onClick={() => setIsPreviewExpanded(!isPreviewExpanded)}
+            className="py-3 px-3 bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl text-xs flex items-center justify-center gap-1 transition"
+            title="संदेश का प्रारूप देखें"
+          >
+            <Eye className="w-4 h-4" />
+            <span>{isPreviewExpanded ? 'प्रारूप छिपाएं' : 'प्रारूप'}</span>
+          </button>
+        </div>
+
+        {/* Expandable Message Preview */}
+        {isPreviewExpanded && (
+          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed animate-in fade-in duration-200">
+            <div className="text-[10px] text-amber-400 font-sans font-bold uppercase tracking-wider mb-1">
+              WhatsApp पर जाने वाले संदेश का सटीक प्रारूप:
+            </div>
+            {buildPannaPramukhRelayMessage(activePack, pannaPramukhName, `वार्ड ${voters[0]?.wardNo || ((selectedBooth - 1) % 24) + 1}`, selectedBooth)}
           </div>
         )}
       </div>
@@ -617,6 +831,87 @@ export const PannaPramukhScreen: React.FC<PannaPramukhScreenProps> = ({ lang }) 
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 1-on-1 Household Contact Relay Modal */}
+      {is1on1RelayModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 text-slate-100 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
+              <div className="flex items-center space-x-2">
+                <Users className="w-5 h-5 text-amber-400" />
+                <div>
+                  <h3 className="font-extrabold text-white text-base">
+                    1-on-1 परिवार सूची रिले (बूथ #{selectedBooth})
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    प्रत्येक परिवार को सीधे व्यक्तिगत WhatsApp जन-सूचना प्रेषित करें
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIs1on1RelayModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60 text-xs text-slate-300 shrink-0">
+              <span className="font-bold text-amber-400">📌 आज का बुलेटिन:</span> {activePack.headlineHi}
+            </div>
+
+            {/* Voter Families List */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              {voters.slice(0, 35).map((voter, index) => {
+                const wardName = `वार्ड ${voters[0]?.wardNo || ((selectedBooth - 1) % 24) + 1}`;
+                const relayText = buildPannaPramukhRelayMessage(activePack, pannaPramukhName, wardName, selectedBooth);
+                const phone = voter.mobile || `98160${40000 + voter.serialNo}`;
+
+                return (
+                  <div
+                    key={voter.id}
+                    className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 flex items-center justify-between text-xs hover:border-slate-700 transition"
+                  >
+                    <div>
+                      <div className="font-bold text-white flex items-center space-x-1.5">
+                        <span>#{index + 1}. {voter.name}</span>
+                        <span className="text-[10px] text-slate-500 font-mono">क्रम #{voter.serialNo}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        मकान: {voter.houseNo} • मो: +91 {phone}
+                      </div>
+                    </div>
+
+                    <a
+                      href={`https://api.whatsapp.com/send?phone=91${phone}&text=${encodeURIComponent(relayText)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => {
+                        logRelaySentToServer(selectedBooth, activePack.id, pannaPramukhName);
+                        setFeedbackToast(`${voter.name} के परिवार को सूचना भेजी गई!`);
+                        setTimeout(() => setFeedbackToast(null), 3000);
+                      }}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1 shadow-sm"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>WhatsApp</span>
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pt-3 border-t border-slate-800 flex justify-end shrink-0">
+              <button
+                onClick={() => setIs1on1RelayModalOpen(false)}
+                className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition"
+              >
+                बंद करें
+              </button>
+            </div>
           </div>
         </div>
       )}

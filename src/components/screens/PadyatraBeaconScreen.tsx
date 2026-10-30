@@ -11,10 +11,19 @@ import {
   RefreshCw, 
   ShieldAlert, 
   Sparkles,
-  CheckCircle2,
-  Car
+  Car,
+  Mic,
+  Volume2,
+  MessageSquare,
+  Bot,
+  CheckCircle2
 } from 'lucide-react';
 import { Language, PadyatraBeaconState } from '../../types/campaign';
+import { 
+  fetchLiveChaupalQuestions, 
+  LiveChaupalComment, 
+  INITIAL_LIVE_CHAUPAL_QUESTIONS 
+} from '../../services/facebookLeadService';
 
 interface PadyatraBeaconScreenProps {
   lang: Language;
@@ -26,6 +35,24 @@ export const PadyatraBeaconScreen: React.FC<PadyatraBeaconScreenProps> = ({ lang
   const [isSimulating, setIsSimulating] = useState(false);
   const [customAnnouncement, setCustomAnnouncement] = useState('');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // Flow 3: Live Chaupal Facebook Teleprompter State
+  const [chaupalQuestions, setChaupalQuestions] = useState<LiveChaupalComment[]>(INITIAL_LIVE_CHAUPAL_QUESTIONS);
+  const [activeSpeechPoint, setActiveSpeechPoint] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchLiveChaupalQuestions().then(q => {
+      if (q && q.length > 0) setChaupalQuestions(q);
+    });
+  }, []);
+
+  const handleStageAnnouncement = (item: LiveChaupalComment) => {
+    const text = `मुझे अभी फेसबुक लाइव पर ${item.location} से हमारे युवा साथियों के कमेंट मिल रहे हैं: "${item.questionText}"... मैं आप सबको आश्वस्त करता हूँ कि इस पर तुरंत कार्रवाई का आदेश जारी हो रहा है!`;
+    setActiveSpeechPoint(text);
+    setChaupalQuestions(prev => prev.map(q => q.id === item.id ? { ...q, isAddressed: true } : q));
+    setToastMsg(`माइक उद्घोषणा तैयार: ${item.location}`);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   // Poll live beacon status every 8 seconds
   const fetchBeacon = async () => {
@@ -201,6 +228,91 @@ export const PadyatraBeaconScreen: React.FC<PadyatraBeaconScreenProps> = ({ lang
             </span>
           </div>
         )}
+      </div>
+
+      {/* FLOW 3: LIVE PADYATRA CHAUPAL DYNAMIC TELEPROMPTER FEED */}
+      <div className="bg-gradient-to-br from-slate-900 via-[#0f243a] to-slate-900 rounded-2xl p-4 sm:p-5 border-2 border-blue-500/40 shadow-xl space-y-3.5 text-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-700/60 pb-3">
+          <div className="flex items-center space-x-2">
+            <span className="p-2 bg-blue-500/20 text-blue-400 rounded-xl border border-blue-500/30">
+              <Bot className="w-4 h-4 animate-pulse" />
+            </span>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="text-xs sm:text-sm font-extrabold text-white">
+                  लाइव चौपाल फेसबुक टेलीप्रॉम्प्टर (Live Chaupal Dynamic Teleprompter)
+                </h3>
+                <span className="px-2 py-0.5 bg-rose-500/20 text-rose-300 border border-rose-500/40 rounded-full text-[10px] font-bold animate-pulse">
+                  ● FB Live स्ट्रीम सक्रिय
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                फेसबुक लाइव देख रहे 10,000+ नागरिकों के स्थानीय प्रश्न सीधे स्टेज स्क्रीन पर
+              </p>
+            </div>
+          </div>
+
+          <span className="text-[11px] font-mono text-amber-400 font-bold">
+            {chaupalQuestions.filter(q => !q.isAddressed).length} नए प्रश्न माइक हेतु तैयार
+          </span>
+        </div>
+
+        {/* Active Prompter Speech Card */}
+        {activeSpeechPoint && (
+          <div className="bg-amber-950/40 border border-amber-500/60 p-3.5 rounded-xl space-y-1.5 animate-in slide-in-from-top duration-200">
+            <div className="flex items-center space-x-2 text-amber-400 text-xs font-bold">
+              <Mic className="w-4 h-4" />
+              <span>स्टेज माइक उद्घोषणा (Teleprompter Prompt):</span>
+            </div>
+            <p className="text-xs text-white leading-relaxed font-medium italic">
+              "{activeSpeechPoint}"
+            </p>
+          </div>
+        )}
+
+        {/* Live Aggregated Audience Questions */}
+        <div className="space-y-2.5">
+          {chaupalQuestions.map(item => (
+            <div
+              key={item.id}
+              className={`p-3 rounded-xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
+                item.isAddressed
+                  ? 'bg-slate-900/40 border-slate-800 opacity-60'
+                  : 'bg-slate-950/80 border-slate-700/80 hover:border-slate-600'
+              }`}
+            >
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2 text-xs">
+                  <span className="font-bold text-white">{item.location} (वार्ड {item.wardNo})</span>
+                  <span className="text-[10px] text-slate-400">• {item.userName}</span>
+                  <span className="px-2 py-0.2 bg-blue-500/20 text-blue-300 rounded text-[10px] font-bold">
+                    {item.countOfSimilarQuestions} लोग यही पूछ रहे हैं
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 font-medium">
+                  "{item.questionText}"
+                </p>
+              </div>
+
+              <div className="shrink-0">
+                {item.isAddressed ? (
+                  <span className="px-3 py-1.5 bg-emerald-950/60 text-emerald-300 border border-emerald-700/60 rounded-xl text-xs font-bold flex items-center space-x-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>माइक पर संबोधित</span>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => handleStageAnnouncement(item)}
+                    className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
+                  >
+                    <Mic className="w-3.5 h-3.5" />
+                    <span>माइक पर उद्घोष करें</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Ward Proximity Radar Table */}

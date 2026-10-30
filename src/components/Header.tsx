@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Phone, Smartphone, Monitor } from 'lucide-react';
 import { MLA_INFO } from '../data/campaignData';
 import { Language } from '../types/campaign';
+import { fetchMlaProfile } from '../services/api';
 
 interface HeaderProps {
   lang: Language;
@@ -20,13 +21,21 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenVoiceDesk,
   onOpenAdmin
 }) => {
+  const [profile, setProfile] = useState<any>(MLA_INFO);
+
+  useEffect(() => {
+    fetchMlaProfile().then(p => {
+      if (p) setProfile(p);
+    });
+  }, []);
+
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-2.5 flex items-center justify-between shadow-xs">
       {/* Brand & Constituency */}
       <div className="flex items-center gap-2.5">
         <div className="relative">
           <img 
-            src={MLA_INFO.logoUrl} 
+            src={profile.logoUrl || MLA_INFO.logoUrl} 
             alt="Logo" 
             className="w-10 h-10 rounded-full border border-amber-500 shadow-xs object-cover bg-[#102a43]" 
           />
@@ -34,10 +43,10 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
         <div>
           <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block leading-tight">
-            {lang === 'hi' ? MLA_INFO.constituency : MLA_INFO.constituencyEn}
+            {lang === 'hi' ? profile.constituency : profile.constituencyEn}
           </span>
           <h1 className="text-sm font-extrabold text-[#102a43] leading-snug">
-            {lang === 'hi' ? MLA_INFO.name : MLA_INFO.nameEn}
+            {lang === 'hi' ? profile.name : profile.nameEn}
           </h1>
         </div>
       </div>
@@ -86,7 +95,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Candidate Profile Avatar */}
         <div className="relative cursor-pointer" onClick={onOpenVoiceDesk} title="रणबीर सिंह निक्का">
           <img 
-            src={MLA_INFO.photoUrl} 
+            src={profile?.photoUrl || MLA_INFO.photoUrl} 
             alt="Ranbir Singh Nikka" 
             className="w-8 h-8 rounded-full object-cover border border-amber-500 shadow-xs hover:scale-105 transition" 
           />

@@ -330,3 +330,157 @@ export async function syncBoothWithServer(boothNo: number): Promise<{
     return { success: false, updatedCount: 0, syncedDoorstepCount: 0 };
   }
 }
+
+// ============================================================================
+// LAYER 2: DECENTRALIZED PANNA PRAMUKH RELAY & CIVIC INTENT SYNTHESIZER
+// ============================================================================
+
+export interface CadreCivicBroadcastPack {
+  id: string; // e.g. PACK-2026-OCT-30
+  date: string;
+  category: 'HEALTH_CAMP' | 'WEATHER_DISASTER' | 'WATER_POWER_NOTICE' | 'YOJANA_CAMP';
+  headlineHi: string;
+  headlineEn: string;
+  bulletPoints: string[];
+  mlaAudioUrl?: string;
+  tollFreeNumber: string; // 1800-123-456
+  status: 'ACTIVE' | 'ARCHIVED';
+}
+
+export interface BoothRelayTelemetry {
+  boothNo: number;
+  boothName: string;
+  wardNo: number;
+  pannaPramukhName: string;
+  pannaPramukhPhone: string;
+  packId: string;
+  assignedHouseholds: number; // e.g. 35 to 45
+  relayedByCadre: boolean;
+  relayInitiatedAt?: string;
+  totalReads: number;
+  coveragePercentage: number;
+  lastReadTimestamp?: string;
+}
+
+export const FALLBACK_CIVIC_PACK: CadreCivicBroadcastPack = {
+  id: 'PACK-2026-OCT-30',
+  date: '30 अक्टूबर 2026',
+  category: 'HEALTH_CAMP',
+  headlineHi: 'वार्ड 14 जसूर: कल सुबह 10 बजे निशुल्क नेत्र एवं स्वास्थ्य जांच शिविर',
+  headlineEn: 'Ward 14 Jasur: Free Eye & Health Checkup Camp Tomorrow 10 AM',
+  bulletPoints: [
+    'कांगड़ा फोर्टिस एवं रोटरी क्लब के विशेषज्ञ डॉक्टरों द्वारा जांच व दवा वितरण।',
+    'मुफ्त मोतियाबिंद जांच एवं जरूरतमंद बुजुर्गों को निशुल्क चश्मा वितरण।',
+    'स्थान: सामुदायिक भवन जसूर, समय: सुबह 10:00 से दोपहर 03:00 बजे तक।'
+  ],
+  mlaAudioUrl: '/audio/nikka-health-camp-advisory.mp3',
+  tollFreeNumber: '1800-123-456',
+  status: 'ACTIVE'
+};
+
+/**
+ * Dynamic WhatsApp URL Synthesizer
+ * Generates an authentic neighbor-to-neighbor civic notice that bypasses Meta/WhatsApp political spam bans.
+ */
+export function buildPannaPramukhRelayMessage(
+  pack: CadreCivicBroadcastPack,
+  pannaPramukhName: string,
+  wardName: string,
+  boothNo: number
+): string {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://janadesh.in';
+  const trackingUrl = `${origin}/api/c/${boothNo}/${pack.id}`;
+  
+  return `*राम राम जी! ${wardName} (बूथ सं. ${boothNo}) के लिए जरूरी जन-सूचना:*\n\n` +
+    `📌 *${pack.headlineHi}*\n` +
+    pack.bulletPoints.map(pt => `• ${pt}`).join('\n') + '\n\n' +
+    `🎧 विधायक जी का 20s ऑडियो संदेश व विवरण यहाँ देखें व सुनें:\n👉 ${trackingUrl}\n\n` +
+    `किसी भी आपातकालीन या नागरिक समस्या हेतु विधायक कैंप कार्यालय टोल-फ्री: ${pack.tollFreeNumber}\n` +
+    `— आपका पड़ोसी, *${pannaPramukhName}* (जनसेवक दल, नूरपुर)`;
+}
+
+/**
+ * Fetch latest civic broadcast pack from server or local offline cache
+ */
+export async function fetchCadreBroadcastPacks(): Promise<{
+  activePack: CadreCivicBroadcastPack;
+  allPacks: CadreCivicBroadcastPack[];
+}> {
+  try {
+    const res = await fetch('/api/cadre/broadcast-packs');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.activePack) {
+        localStorage.setItem('cadre_active_pack', JSON.stringify(data.activePack));
+        localStorage.setItem('cadre_all_packs', JSON.stringify(data.allPacks || [data.activePack]));
+        return { activePack: data.activePack, allPacks: data.allPacks || [data.activePack] };
+      }
+    }
+  } catch (err) {
+    console.warn('[Offline] Could not fetch server pack, checking local storage:', err);
+  }
+
+  const cached = localStorage.getItem('cadre_active_pack');
+  if (cached) {
+    try {
+      const activePack = JSON.parse(cached);
+      const allPacks = JSON.parse(localStorage.getItem('cadre_all_packs') || '[]') || [activePack];
+      return { activePack, allPacks };
+    } catch {}
+  }
+
+  return { activePack: FALLBACK_CIVIC_PACK, allPacks: [FALLBACK_CIVIC_PACK] };
+}
+
+/**
+ * Notify server that Panna Pramukh has forwarded the relay pack to their booth
+ */
+export async function logRelaySentToServer(
+  boothNo: number,
+  packId: string,
+  pannaPramukhName: string
+): Promise<boolean> {
+  // Mark in local storage immediately for offline resilience
+  localStorage.setItem(`booth_${boothNo}_relayed_${packId}`, new Date().toISOString());
+
+  try {
+    const res = await fetch('/api/cadre/log-relay-sent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ boothNo, packId, pannaPramukhName })
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[Offline] Saved relay action locally:', err);
+    return true;
+  }
+}
+
+/**
+ * Fetch 118-Booth Relay Leaderboard for War Room
+ */
+export async function fetchRelayLeaderboard(): Promise<{
+  stats: {
+    totalBooths: number;
+    totalHouseholds: number;
+    totalReads: number;
+    avgCoveragePct: number;
+    activeCadresCount: number;
+    topActiveCount: number;
+    inProgressCount: number;
+    sluggishCount: number;
+  };
+  leaderboard: BoothRelayTelemetry[];
+} | null> {
+  try {
+    const res = await fetch('/api/cadre/relay-leaderboard');
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
+  } catch (err) {
+    console.warn('Could not fetch relay leaderboard:', err);
+  }
+  return null;
+}
+

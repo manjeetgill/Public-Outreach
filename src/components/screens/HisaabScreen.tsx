@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   CheckCircle2, 
   Quote, 
@@ -17,17 +17,53 @@ import {
 } from 'lucide-react';
 import { INITIAL_PROJECTS, MLA_INFO } from '../../data/campaignData';
 import { ProjectItem, Language } from '../../types/campaign';
+import { fetchConstituencyProjects, fetchMlaProfile } from '../../services/api';
 
 interface HisaabScreenProps {
   lang: Language;
 }
 
 export const HisaabScreen: React.FC<HisaabScreenProps> = ({ lang }) => {
+  const [projects, setProjects] = useState<ProjectItem[]>(INITIAL_PROJECTS);
+  const [mlaProfile, setMlaProfile] = useState<any>(MLA_INFO);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedWard, setSelectedWard] = useState<number | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const filteredProjects = INITIAL_PROJECTS.filter((proj) => {
+  useEffect(() => {
+    fetchMlaProfile().then(p => {
+      if (p) setMlaProfile(p);
+    });
+
+    setIsLoading(true);
+    fetchConstituencyProjects().then(data => {
+      if (data && data.length > 0) {
+        const mapped: ProjectItem[] = data.map((d: any) => ({
+          id: d.id,
+          title: d.title,
+          titleEn: d.title_en || d.title,
+          category: d.category,
+          categoryLabel: d.category_label || 'विकास कार्य',
+          categoryLabelEn: d.category_label_en || 'Development Work',
+          ward: d.ward_name || `वार्ड ${d.ward_no}`,
+          wardNo: d.ward_no,
+          cost: `₹${d.cost_sanctioned_lakhs >= 100 ? (d.cost_sanctioned_lakhs / 100).toFixed(2) + ' करोड़' : d.cost_sanctioned_lakhs + ' लाख'} स्वीकृत`,
+          sanctionNo: d.sanction_no,
+          status: d.status,
+          description: d.description,
+          descriptionEn: d.description_en || d.description,
+          impact: d.impact_summary,
+          feedbackAuthor: d.feedback_author || 'स्थानीय नागरिक',
+          feedbackRole: d.feedback_role || 'ग्रामवासी',
+          feedbackText: d.feedback_text || 'सराहनीय कार्य'
+        }));
+        setProjects(mapped);
+      }
+    }).finally(() => setIsLoading(false));
+  }, []);
+
+  const filteredProjects = projects.filter((proj) => {
     const matchesCat = selectedCategory === 'all' || proj.category === selectedCategory;
     const matchesWard = selectedWard === 'all' || proj.wardNo === selectedWard;
     const matchesSearch = 
@@ -69,7 +105,7 @@ export const HisaabScreen: React.FC<HisaabScreenProps> = ({ lang }) => {
       {/* 2. Aggregate Stats */}
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
-          <div className="text-base font-extrabold text-[#102a43]">{MLA_INFO.stats.totalSchemes}</div>
+          <div className="text-base font-extrabold text-[#102a43]">{mlaProfile?.stats?.totalSchemes || 142}</div>
           <div className="text-[10px] text-slate-500 font-semibold">
             {lang === 'hi' ? 'कुल योजनाएं' : 'Total Schemes'}
           </div>
@@ -78,7 +114,7 @@ export const HisaabScreen: React.FC<HisaabScreenProps> = ({ lang }) => {
           </span>
         </div>
         <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
-          <div className="text-base font-extrabold text-amber-600">₹{MLA_INFO.stats.totalGrantSanctionedCr} Cr</div>
+          <div className="text-base font-extrabold text-amber-600">₹{mlaProfile?.stats?.totalGrantSanctionedCr || 118} Cr</div>
           <div className="text-[10px] text-slate-500 font-semibold">
             {lang === 'hi' ? 'निधि व ग्रांट' : 'Fund & Grants'}
           </div>
@@ -87,7 +123,7 @@ export const HisaabScreen: React.FC<HisaabScreenProps> = ({ lang }) => {
           </span>
         </div>
         <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
-          <div className="text-base font-extrabold text-emerald-600">{MLA_INFO.stats.resolutionRate}</div>
+          <div className="text-base font-extrabold text-emerald-600">{mlaProfile?.stats?.resolutionRate || '94%'}</div>
           <div className="text-[10px] text-slate-500 font-semibold">
             {lang === 'hi' ? 'समय पर पूर्ण' : 'On-Time'}
           </div>

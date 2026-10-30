@@ -36,7 +36,9 @@ import {
   Copy,
   Share2,
   HeartHandshake,
-  Award
+  Award,
+  Users,
+  Bot
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { MLA_INFO } from '../../data/campaignData';
@@ -55,6 +57,9 @@ import { NijaatTrustFundLedger } from '../admin/NijaatTrustFundLedger';
 import { BoothSentimentHeatmap } from '../admin/BoothSentimentHeatmap';
 import { HighCommandDossierModal } from '../admin/HighCommandDossierModal';
 import { VipVoiceBroadcastModal } from '../admin/VipVoiceBroadcastModal';
+import { CadreRelayLeaderboard } from '../admin/CadreRelayLeaderboard';
+import { FacebookAudienceFunnel } from '../admin/FacebookAudienceFunnel';
+import { MlaPocketWarRoom } from '../admin/MlaPocketWarRoom';
 
 interface AdminScreenProps {
   lang: Language;
@@ -64,7 +69,7 @@ interface AdminScreenProps {
 
 export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview, onOpenMlaLetter }) => {
   // VIP Corporate ERP & Leadership Suite state
-  const [executiveView, setExecutiveView] = useState<'WAR_ROOM' | 'TRUST_FUND' | 'BOOTH_HEATMAP'>('WAR_ROOM');
+  const [executiveView, setExecutiveView] = useState<'MLA_POCKET_VIEW' | 'WAR_ROOM' | 'TRUST_FUND' | 'BOOTH_HEATMAP' | 'CADRE_RELAY' | 'FACEBOOK_FUNNEL'>('MLA_POCKET_VIEW');
   const [isDossierModalOpen, setIsDossierModalOpen] = useState(false);
   const [isVoiceBroadcastModalOpen, setIsVoiceBroadcastModalOpen] = useState(false);
 
@@ -634,6 +639,18 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview
         {/* View Switchers & High-Impact Triggers */}
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
+            onClick={() => setExecutiveView('MLA_POCKET_VIEW')}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
+              executiveView === 'MLA_POCKET_VIEW'
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/25 ring-2 ring-amber-300'
+                : 'bg-slate-800 text-amber-300 hover:text-white border border-amber-500/40'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <span>⚡ विधायक 1-टच पॉकेट वॉर रूम</span>
+          </button>
+
+          <button
             onClick={() => setExecutiveView('WAR_ROOM')}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
               executiveView === 'WAR_ROOM'
@@ -670,6 +687,30 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview
           </button>
 
           <button
+            onClick={() => setExecutiveView('CADRE_RELAY')}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
+              executiveView === 'CADRE_RELAY'
+                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
+                : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5 text-emerald-400" />
+            <span>कैडर रिले मॉनिटर</span>
+          </button>
+
+          <button
+            onClick={() => setExecutiveView('FACEBOOK_FUNNEL')}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
+              executiveView === 'FACEBOOK_FUNNEL'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
+                : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+            }`}
+          >
+            <Bot className="w-3.5 h-3.5 text-blue-400" />
+            <span>फेसबुक 100k फनल</span>
+          </button>
+
+          <button
             onClick={() => setIsDossierModalOpen(true)}
             className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md border border-blue-400/40"
           >
@@ -688,6 +729,14 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview
       </div>
 
       {/* Render selected view */}
+      {executiveView === 'MLA_POCKET_VIEW' && (
+        <MlaPocketWarRoom 
+          lang={lang} 
+          onOpenVoiceBroadcast={() => setIsVoiceBroadcastModalOpen(true)}
+          onOpenMlaLetter={onOpenMlaLetter}
+        />
+      )}
+
       {executiveView === 'TRUST_FUND' && (
         <NijaatTrustFundLedger lang={lang} onClose={() => setExecutiveView('WAR_ROOM')} />
       )}
@@ -697,6 +746,20 @@ export const AdminScreen: React.FC<AdminScreenProps> = ({ lang, onBackToOverview
           lang={lang} 
           onClose={() => setExecutiveView('WAR_ROOM')} 
           onOpenTrustFund={() => setExecutiveView('TRUST_FUND')}
+        />
+      )}
+
+      {executiveView === 'CADRE_RELAY' && (
+        <CadreRelayLeaderboard 
+          lang={lang} 
+          onClose={() => setExecutiveView('WAR_ROOM')} 
+        />
+      )}
+
+      {executiveView === 'FACEBOOK_FUNNEL' && (
+        <FacebookAudienceFunnel 
+          lang={lang} 
+          onClose={() => setExecutiveView('WAR_ROOM')} 
         />
       )}
 
